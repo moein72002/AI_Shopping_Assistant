@@ -1,0 +1,91 @@
+---
+alwaysApply: true
+---
+
+### Searches Table
+This table stores the log for each search results page.
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | The unique identifier for each search results page. It is used to connect other logs (like views and clicks) to this search. |
+| `uid` | The unique identifier for a search (including all pages). This ID is the same for all pages of a specific search. (Equal to the id of page zero). |
+| `query` | The search term entered by the user. |
+| `page` | The page number in the search results (the first page starts from index 0). |
+| `timestamp` | The exact time the search log was recorded in the database in UTC. |
+| `session_id` | The user's session ID. |
+| `result_base_product_rks` | A list of the `base_random_key` codes for the base products displayed to the user in the results. |
+| `category_id` | The ID of the category to which the user has limited their search. A value of 0 means no category was selected. |
+| `category_brand_boosts` | A list of categories and brands that have received a higher score (boost) in the ranking for this search. |
+
+### Base Views Table
+This table logs each time a user clicks on one of the base products in the search results.
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | The unique identifier for each base product page view event. |
+| `search_id` | The ID of the search page from which this view originated (connects to the `id` in the `search` table). |
+| `base_product_rk` | The random key of the base product that was viewed. |
+| `timestamp` | The exact time the view log was recorded in the database in UTC. |
+
+### Final Click Table
+This table records information related to the user's final clicks on shop products.
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | The unique identifier for each click event. |
+| `base_view_id` | The ID that connects this click to a product page view (`base_view`). |
+| `shop_id` | The ID of the shop to which the clicked item belongs. |
+| `timestamp` | The exact time the click occurred in UTC. |
+
+### Base Products Table
+
+| Column Name | Description |
+| :--- | :--- |
+| `random_key` | The unique identification key for the base product. |
+| `persian_name` | Persian name of the product. |
+| `english_name` | English name of the product. |
+| `category_id` | The product's category ID. |
+| `brand_id` | The product's brand ID. |
+| `extra_features` | Additional product features (JSON). |
+| `image_url` | The URL of the product image. |
+| `members` | A list of product random keys (foreign key to the `members` table). |
+
+### Members Table (Shop Products)
+
+| Column Name | Description |
+| :--- | :--- |
+| `random_key` | The unique identifier for a product in a shop. |
+| `base_random_key` | The key that connects this product to a base product. |
+| `shop_id` | The shop ID. |
+| `price` | The price of the product in this shop. |
+
+### Shops Table
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | Shop ID. |
+| `city_id` | The ID of the shop's city. |
+| `score` | The shop's score on Torob, which is calculated based on the result of order tracking on Torob and is a number between zero and five. |
+| `has_warranty` | Whether the shop has a Torob warranty. |
+
+### Categories Table
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | Category ID. |
+| `title` | Category title. |
+| `parent_id` | The parent category ID. Categories have a hierarchical structure where each category has a parent and may have multiple children. If it has no parent, this field has a value of -1. |
+
+### Brands Table
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | Brand ID. |
+| `title` | Brand title. |
+
+### Cities Table
+
+| Column Name | Description |
+| :--- | :--- |
+| `id` | City ID. |
+| `name` | City name. |

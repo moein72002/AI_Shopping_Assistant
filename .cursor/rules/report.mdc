@@ -1,0 +1,137 @@
+---
+description: -   **Content**: A template for the final project report and a script for the 5-minute video presentation. It summarizes the architecture, features, and challenges.     -   **When to use**: To structure the final presentation and report. It also contains example `pytest` tests.
+alwaysApply: false
+---
+## 📄 `report.mdc`: Project Report & Video Script Outline
+
+This report details the final implementation of the AI Shopping Assistant. It can also serve as a script for the 5-minute presentation video.
+
+### **Project Title: Torob AI Shopping Assistant**
+
+  * **Team/Participant Name**: [Your Name/Team Name]
+  * **Core Idea**: A multi-modal, conversational AI agent that leverages LLM function calling to intelligently assist users with their shopping needs on Torob.
+
+### **System Architecture Overview**
+
+Our system is a Python-based application built on the FastAPI framework. The core of our assistant is an **Intent Router** powered by OpenAI's `gpt-4o`. This router analyzes the user's request and dynamically chooses the correct tool for the job from a specialized toolkit, which includes:
+
+1.  A **Translation Layer** to handle Persian language.
+2.  A **Vector Search Tool** for semantic product discovery using `faiss`.
+3.  A **Database Tool** for answering precise questions via Text-to-SQL.
+4.  A **Vision Tool** that uses the OpenAI Vision API to understand user-uploaded images.
+5.  A **State Manager** to enable multi-turn, human-like conversations.
+
+This modular, tool-based architecture allows for accurate, efficient, and scalable request handling.
+
+### **Implemented Features (by Scenario)**
+
+  * **Scenarios 1, 8, 9 (Product & Similarity Search)**:
+      * **Approach**: Implemented a RAG pipeline. Product data was embedded using OpenAI and stored in a `faiss` vector index for fast semantic search.
+  * **Scenarios 2, 3 (Fact-Based Q\&A)**:
+      * **Approach**: Used a Text-to-SQL agent. The LLM generates SQL queries on the fly based on the user's question and our database schema, ensuring precise answers.
+  * **Scenario 4 (Conversational Search)**:
+      * **Approach**: Implemented an in-memory state manager to track `chat_id` history. The LLM uses this history to ask clarifying questions until the user's intent is clear enough to dispatch to another tool.
+  * **Scenario 5 (Product Comparison)**:
+      * **Approach**: The system identifies the products to be compared, fetches their structured data using the Database Tool, and then uses an LLM to generate a qualitative comparison based on the user's stated goal.
+  * **Scenario 6 (Image Identification)**:
+      * **Approach**: The user's image is sent to the OpenAI Vision API with a prompt asking it to describe the main object. This provides a direct answer without needing to search our database.
+  * **Scenario 7 (Image-based Search)**:
+      * **Approach**: We use a novel two-step "Vision-to-RAG" pipeline. The OpenAI Vision API first converts the user's image into a rich text description. This text is then fed into our existing `VectorSearchTool` to find semantically similar products.
+
+### **Challenges & Solutions**
+
+  * **Challenge**: Handling the diverse range of user intents (search, Q\&A, comparison, vision).
+  * **Solution**: We implemented an **LLM-based Intent Router with Function Calling**. This is more robust than simple classification, as it allows the LLM to reason about which tool is best suited for a given query.
+  * **Challenge**: Answering both vague semantic queries and precise factual questions.
+  * **Solution**: We created two separate tools: a RAG-based `VectorSearchTool` for semantic search and a Text-to-SQL `DatabaseTool` for factual lookups. The Intent Router seamlessly directs the user to the correct one.
+
+### **Testing Strategy: Correctness-Driven Evaluation**
+
+To ensure our agent is robust and accurate, we developed a local evaluation suite using `pytest`. Our philosophy is to write **correctness-driven tests** that verify the agent's responses against the ground truth in our own database. This allows us to test all scenarios without using our limited official judging attempts and ensures our agent's answers are factually correct.
+
+**Note**: The code snippets below are simplified examples to illustrate the testing concept.
+
+#### **Database-Verified Tests (for Scenarios 1, 2, 3)**
+
+For scenarios with a clear right or wrong answer, our tests first query our SQLite database to find the expected, correct answer. Then, they call the agent and assert that the agent's response matches the ground truth from the database.
+
+```python
+# tests/test_api.py
+import sqlite3
+
+DB_PATH = "torob.db"
+
+def test_scenario_1_exact_product_correctness():
+    """
+    Tests if the agent can find the correct product based on its name.
+    1. Find the expected random_key from the database.
+    2. Call the agent via the API.
+    3. Assert the agent's response contains the correct key.
+    """
+    # 1. Find ground truth from DB
+    conn = sqlite3.connect(DB_PATH)
+    expected_key = conn.execute(
+        "SELECT random_key FROM base_products WHERE persian_name LIKE '%دراور چهار کشو (کد D14)%' "
+    ).fetchone()[0]
+    conn.close()
+
+    # 2. Call agent
+    response = client.post("/chat", json={
+        "messages": [{"type": "text", "content": "لطفاً دراور چهار کشو (کد D14) را برای من تهیه کنید."}]
+    })
+    data = response.json()
+
+    # 3. Assert correctness
+    assert expected_key in data["base_random_keys"]
+
+def test_scenario_2_feature_correctness():
+    """
+    Tests if the agent returns the correct feature for a product.
+    1. Find the product and its expected feature value from the database.
+    2. Call the agent.
+    3. Assert the agent's response contains the correct value.
+    """
+    # 1. Find ground truth (this requires knowing the product and feature)
+    # In a real test, you'd look up the product and parse its 'extra_features' JSON
+    expected_value = "1.18"
+
+    # 2. Call agent
+    response = client.post("/chat", json={
+        "messages": [{"type": "text", "content": "عرض پارچه تریکو جودون 1/30 لاکرا گردباف نوریس به رنگ زرد طلایی چقدر است؟"}]
+    })
+    data = response.json()
+    
+    # 3. Assert correctness
+    assert expected_value in data["message"]
+```
+
+#### **LLM-as-Judge (for Scenarios 4, 5)**
+
+For scenarios where the response quality is subjective (e.g., conversational flow, comparison logic), we use another LLM call as a judge.
+
+```python
+# test_qualitative.py
+import openai
+
+def llm_judge(question, agent_response, expected_behavior):
+    """Uses an LLM to judge the quality of a response."""
+    prompt = f"""
+    You are an evaluation judge.
+    User Question: "{question}"
+    Agent Response: "{agent_response}"
+    Expected Behavior: "{expected_behavior}"
+
+    Does the agent's response meet the expected behavior? Answer with only "Yes" or "No".
+    """
+    response = openai.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
+    return "Yes" in response.choices[0].message.content
+
+def test_scenario_5_comparison():
+    """Tests if the comparison response is logical."""
+    question = "Which is better for a child, the watermelon mug or the latte mug?"
+    # Assume we get the agent's response for this question
+    agent_response = "The watermelon mug is better because its cartoon design is more appealing to children."
+    expected = "The agent should choose the mug with the fantasy/cartoon style and justify why it's suitable for children."
+    
+    assert llm_judge(question, agent_response, expected) == True
+```

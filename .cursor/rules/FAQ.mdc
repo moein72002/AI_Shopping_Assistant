@@ -1,0 +1,170 @@
+---
+alwaysApply: true
+---
+
+Of course, here is the translation from Persian to English:
+
+The problem is huge! Where should I start?
+
+Our recommendation is to solve the problem piece by piece. Always have a deployed solution and don't leave the deployment for the last day of the competition. Make good use of the 10 times you can call the `judge` and save the `trace` of the assistant's input and output to requests for yourself and be sure to review it. Try to make good use of free services to save on your costs.
+
+***
+
+## Is the second stage of the competition in-person or virtual?
+
+The second stage will be held entirely virtually.
+
+***
+
+## Where is the online leaderboard?
+
+You can view the competition leaderboard by visiting your panel.
+
+***
+
+## My service works on local, how can I deploy my code?
+
+You can use any method you want for deployment. We need the domain of your service in the `judge` to send requests to it.
+
+Our suggestion is to use the darkube Hamrosh platform for deployment.
+
+To facilitate this process, a one-million gift card from Hamrosh has been given to each person, which can be received through the panel.
+
+***
+
+## How do I deploy in Hamrosh?
+
+For this, you can check the Hamrosh docs. This video also shows the process practically.
+
+***
+
+## How much OpenAI credit do I have and where can I get it?
+
+Each person has been given $10 of OpenAI credit. To get the `api-key`, you can refer to the competition panel. Also, you are only allowed to use `llm` through the Torob proxy provided to you. If you use another `llm` or directly request from OpenAI, you will be eliminated from the final evaluation of the competition.
+
+***
+
+## Are there any specific restrictions on the use of programming languages, technologies, libraries, or AI frameworks?
+
+No, you can use any technology, programming language, etc., but you must provide the output in the format requested in the problem statement.
+
+***
+
+## In addition to the data provided in the problem statement, is it possible to use other external data (such as general knowledge) to improve the responses?
+
+Yes, you can use any external data. This is also recommended. Be sure to mention this in your 5-minute video.
+
+***
+
+## What is the final deadline for submitting the code, video, and domain?
+
+It is better to submit the domain as soon as possible so that the output of your `agent` can be seen on the online leaderboard. But there is no specific restriction, and you can register the domain until the last day of the competition.
+
+However, you must submit the video and provide access to the code before Friday, September 26th at 12:00 AM to be included in the competition judging.
+
+***
+
+## Is there a specific communication channel (e.g., Discord or a Telegram group) for support or technical questions?
+
+Yes, all announcements will be made through the Torob Turbo Telegram channel. Also, if you have any questions, you can ask via Telegram from the ID @TorobTurbo.
+
+***
+
+## How many requests are sent to our service for the Public Leaderboard?
+
+The performance of your agent will be measured in a number of different scenarios. The number of test cases for each scenario is different and may be between 10-50 test cases. The number of test cases for each scenario may also increase during the competition (but it will definitely not exceed 50).
+
+***
+
+## Is it possible to see the requests that are sent to our service (for debugging or checking errors)?
+
+Yes, you can log the requests and view them on your end and use these requests to improve your agent.
+
+***
+
+## Is the assistant expected to be able to handle follow-up questions or more complex conversations?
+
+Yes, in some scenarios, it is necessary for the assistant to interact with the user and ultimately help the user achieve their goal.
+
+***
+
+## Is the assistant expected to provide appropriate responses for products that are not in the dataset (for example, by saying that such a product is not available)?
+
+Yes, if the assistant cannot help the user with the data it has, it is better to mention this in the response to the user and avoid giving nonsensical answers.
+
+***
+
+## If the user's request is ambiguous, should the assistant ask more questions to clarify the user's goal?
+
+Yes. If the user's questions are ambiguous, your assistant should try to help the user achieve their goal by asking appropriate questions.
+
+***
+
+## What happens if I use prompt injection or hack the judge?
+
+First of all, this will not help you much, because the prompts for the `public leaderboard` and `private leaderboard` are different.
+
+We also log and review the requests, and any attempt to hack the `judge` or use `prompt injection` will result in your disqualification from the competition.
+
+***
+
+## What are the details of the scoring method in the leaderboard?
+
+The criterion for evaluating the assistant by the `judge` is only the correct answer to the test case. Of course, in some test cases, this correct answer is determined qualitatively (the quality of the response). The response speed of your assistant does not affect your score on the test case. However, the competition `judge` has a 30-second timeout on requests, and the assistant's response time to each request should not exceed 30 seconds.
+
+***
+
+## In the chat API output, there are three fields that are nullable. How should we fill them?
+
+The competition `judge`'s operation is such that whenever it receives `base_random_keys` or `member_random_keys` in the output, it will not provide any further response and will consider the chat session terminated. Use these fields only for the final response if the user is looking for a specific product.
+
+***
+
+## How can I find out why the judge has evaluated my answers as incorrect?
+
+From within the panel, there is a section where you can receive and review the detailed evaluation for each verification request you have sent to the `judge`.
+
+***
+
+## What are the judging criteria for the 5-minute video?
+
+In general, the important criteria for judging the video are as follows:
+
+**Clarity and lucidity of the presentation:**
+* Does the video clearly and comprehensibly explain the team's solution and approach?
+* Is the video structure logical and easy to follow from beginning to end?
+
+**Creativity and innovation in the solution:**
+* Has the team presented innovative or creative approaches to solving the problem (especially in complex scenarios)?
+* Have new techniques or tools been used? (For example, using external data not included in the problem's dataset.)
+
+**Technical depth and complexity of the solution:**
+* Does the video provide insight into the technical depth of the solution (without needing to show the full code), such as system architecture, models used, or main algorithms?
+* Are the complexities the team faced and how they were overcome explained?
+
+**Effectiveness and efficiency of the solution (according to the leaderboard performance):**
+* Although the video does not necessarily show practical performance, it can explain how the solution's design led to the improvements observed on the leaderboard.
+
+***
+
+## Can you explain the public leaderboard and private leaderboard better?
+
+The evaluation method is that for each scenario, we have 3 categories of test cases: training, validation, and test.
+
+The training test cases are the same examples that we have provided for each scenario in the problem definition.
+
+We will send you requests for the validation test cases for every submission you make.
+
+We will keep the test test cases and send you all the requests on the last day of the competition.
+
+***
+
+## Can I use local models?
+
+Since we send requests to your service, whatever model you use, you must be able to deploy it. Deploying these local models usually requires a lot of resources and is costly. Small models also have much lower quality than OpenAI models, so our suggestion is to use the same OpenAI language models.
+
+***
+
+## What precision is required for responding with decimal number formats?
+
+The maximum difference should be less than 2 decimal places.

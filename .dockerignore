@@ -1,0 +1,49 @@
+# Exclude everything by default to minimize build context
+**
+
+# Include only what the image needs
+!.dockerignore
+!requirements.txt
+!main.py
+!torob.db
+!tools
+!tools/**
+
+# Optional vector indexes (uncomment locally if present and needed)
+!vector_index.faiss
+!vector_index.faiss.json
+!vector_index_names.faiss
+!vector_index_names.faiss.json
+
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+
+# Secrets
+.env
+*.env

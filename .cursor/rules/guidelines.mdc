@@ -1,0 +1,268 @@
+---
+alwaysApply: true
+---
+
+Strategic Guide for a Competitive AI Shopping Assistant
+
+
+Section 1: Analysis of Core AI Problems and Architectural Patterns
+
+This section deconstructs the AI Shopping Assistant challenge into its fundamental components. A thorough understanding of these core AI problems and their corresponding architectural solutions is the foundation for building a robust and competitive system. The analysis will establish the technical landscape, drawing on established patterns and real-world examples to inform the implementation strategy.
+
+1.1 Deconstructing the AI Shopping Assistant: The Four Pillars of the Challenge
+
+The construction of an advanced AI Shopping Assistant is not a singular problem but an integration of four distinct AI capabilities. Recognizing and addressing each pillar with a specialized approach is essential for creating a system that is both versatile and accurate.
+Conversational Agency: This is the primary interface through which the user interacts with the system. It goes beyond simple question-answering to encompass a suite of technologies that enable fluid, human-like dialogue. This includes Natural Language Processing (NLP) to understand user requests, Natural Language Understanding (NLU) to discern intent and context, and Natural Language Generation (NLG) to formulate coherent responses.1 A successful conversational agent must manage the flow of dialogue, maintain context across multiple turns, and orchestrate the various backend tasks required to fulfill a user's request.3
+Structured Data Querying: A significant portion of the required information—prices, stock levels, seller details—resides in a structured, relational database. Answering precise, factual questions like "How much does product X cost?" necessitates the ability to translate natural language into the Structured Query Language (SQL).4 This capability, known as Text-to-SQL, is a specialized task that requires the AI to understand not only the user's question but also the underlying database schema to generate syntactically correct and semantically meaningful queries.6
+Unstructured Data Retrieval: Many user queries are subjective or discovery-oriented, such as "Find me a comfortable office chair." The answer to such questions lies within unstructured text fields like product names and descriptions. This problem domain is best addressed by Retrieval-Augmented Generation (RAG), an architecture that combines information retrieval from a knowledge base with the generative power of a Large Language Model (LLM). RAG allows the system to perform semantic search, understanding the
+intent behind a query rather than just matching keywords, to provide relevant and contextually grounded recommendations.
+Multi-Modal Search and Understanding: The shopping experience is inherently visual. The assistant must therefore be capable of processing image-based queries. This capability splits into two sub-problems: finding products visually similar to a provided image, and extracting textual information (like a price or product name) from an image. This requires a multi-modal architecture that can ingest, process, and search across different data types, bridging the gap between visual input and the text-based product catalog.
+
+1.2 Architectural Blueprints for E-commerce AI
+
+For each of the four pillars identified, there are established architectural blueprints that have proven effective in production systems. Adopting these patterns provides a reliable foundation for development.
+
+Conversational Agents (The Conductor)
+
+Modern conversational AI systems are increasingly built around an "agentic" architecture. In this model, a central LLM acts as a reasoning engine or "conductor".2 Rather than being programmed with rigid, rule-based logic, the agent is given access to a suite of "tools" (specialized functions) and uses its reasoning capabilities to decide which tool to use in response to a user's query.15 Frameworks like LangChain are designed specifically to facilitate the creation of such agents, providing components for managing prompts, memory, and tool execution.16 The open-source
+Ecommerce-RAG-Chatbot project serves as a practical example, implementing a system that intelligently routes user queries to either a product search function or an order management function, demonstrating this core principle of tool selection.8
+
+Text-to-SQL Systems (The Analyst)
+
+A high-performing Text-to-SQL system is more than a simple text -> LLM -> SQL pipeline. The established architectural pattern involves a preliminary step that mirrors RAG: before attempting to generate a query, the system retrieves the relevant database schema information (table names, column definitions, data types, and descriptive comments).6 This schema is then provided to the LLM as context within the prompt, dramatically increasing the likelihood of generating a correct query that aligns with the database structure.6
+Furthermore, a robust Text-to-SQL architecture incorporates a "self-correction loop." The system first attempts to generate and execute the SQL query. If the database engine returns a syntax error, that error message is captured and fed back to the LLM in a new prompt, along with the original question and the faulty query. This allows the LLM to analyze its mistake and generate a corrected query, a pattern that significantly improves reliability without manual intervention.6
+
+RAG for Semantic Search (The Librarian)
+
+The canonical architecture for RAG systems in e-commerce follows a clear, four-stage pipeline.9
+Ingestion and Indexing: During a one-time setup process, unstructured text data, such as product descriptions, is divided into manageable chunks. Each chunk is then passed through an embedding model (e.g., Sentence Transformers) to create a high-dimensional vector representation.8
+Storage: These vector embeddings are loaded into a specialized vector database, such as FAISS, Milvus, or MongoDB Atlas Vector Search, which is optimized for efficient high-dimensional similarity searches.11
+Retrieval: When a user submits a query, the same embedding model converts the query text into a vector. The system then performs a nearest-neighbor search in the vector database to find the text chunks with embeddings most similar (i.e., closest in vector space) to the query embedding.
+Generation: The retrieved text chunks are prepended to the user's original query as context within a prompt that is sent to a generative LLM. The LLM then synthesizes this information to produce a fluent, contextually-aware natural language response.10
+This pattern is widely adopted and validated by numerous open-source projects and educational materials, establishing it as the standard for semantic search applications.8
+
+Multi-Modal Search Architectures (The Visionary)
+
+The standard architecture for multi-modal search systems is a three-stage process designed to unify different data types into a comparable format.11
+Data Ingestion and Processing: Raw data from different modalities (e.g., text, images) is ingested and preprocessed. Images might be resized and normalized, while text is cleaned and tokenized. Each modality is then processed by a specialized feature extractor, such as a Convolutional Neural Network (CNN) for images.
+Embedding Generation and Storage: The extracted features are converted into dense vector embeddings. Critically, multi-modal models like CLIP (Contrastive Language-Image Pre-training) are used to map both images and text into a shared embedding space.25 This allows for direct comparison between a text embedding and an image embedding. These unified embeddings are then stored in a vector database.
+Query Handling and Retrieval: A user's query, whether it's a text string or an uploaded image, is converted into an embedding using the same models. A similarity search is then performed in the vector database to retrieve the closest matches, regardless of their original modality.
+For e-commerce, this architecture is often enhanced with hybrid search. This approach combines the semantic understanding of vector search with the precision of traditional keyword-based (lexical) search. This ensures that queries containing specific, non-negotiable terms (e.g., "18k gold ring" versus a visually similar but materially different "gold-plated ring") return highly relevant results.26
+The analysis of these distinct architectural patterns reveals a critical conclusion: a successful shopping assistant for this hackathon cannot be a single, monolithic pipeline. It must be a hybrid system composed of specialized tools. The central engineering challenge, therefore, is not the implementation of each individual tool but the creation of an intelligent agentic router. This component must accurately interpret the user's intent from their natural language query and dispatch it to the appropriate tool—be it the Text-to-SQL Analyst, the RAG Librarian, or the Multi-Modal Visionary. The effectiveness of this router, likely implemented using an LLM with function-calling capabilities, will be the single most important determinant of the system's overall performance and competitiveness.27
+
+Section 2: Hackathon Implementation Strategy and Actionable Recommendations
+
+This section provides a concrete and opinionated implementation plan. Each recommendation is tailored to the unique constraints of a hackathon environment, prioritizing development speed, operational simplicity, and performance to maximize the chances of building a winning solution.
+
+2.1 Overall System Architecture: The Lean Monolith for Speed and Simplicity
+
+For a time-constrained project like a hackathon, the choice of high-level architecture is a critical strategic decision. While microservices offer long-term benefits in scalability and maintainability for large applications, they introduce significant overhead in development, deployment, and operational complexity.29
+Recommendation: Adopt a monolithic architecture. The entire application backend should be built as a single, unified codebase and deployed as a single process.31
+This choice is justified by several key advantages in a hackathon context:
+Rapid Development: A single codebase simplifies development workflows, eliminating the need to manage inter-service communication protocols, separate repositories, or complex API versioning.30
+Simplified Testing: End-to-end testing is far more straightforward in a monolith, as all components are accessible within the same process, avoiding the complexities of distributed system testing.29
+Straightforward Deployment: Deploying a single application artifact is significantly faster and less error-prone than orchestrating the deployment of multiple independent services.31
+The proposed monolith will consist of the following key components, all within a single application:
+API Server: A lightweight web framework like FastAPI will serve as the single entry point for all incoming user requests. FastAPI is recommended for its high performance and ease of use.18
+Agentic Core: This is the central logic of the application, responsible for receiving requests from the API server, managing the conversational state, and orchestrating the various tools. This core will be built using a framework like LangChain to manage the agentic workflow.15
+Tool Modules: A collection of Python classes or modules, each encapsulating a specific capability (e.g., SQLTool, RAGTool, VisionTool). These are not separate services but are imported and called directly by the Agentic Core within the same process.
+State Manager: A simple in-memory Python dictionary to hold conversation histories, keyed by a unique chat_id.
+The decision to use a monolithic architecture has a direct and powerful implication for state management. Multi-turn conversations require the system to remember previous interactions.33 In a microservices architecture, this state would need to be passed between services with every call or stored in an external, shared database like Redis, introducing network latency and complexity.29 By contrast, a monolith allows all components to share the same memory space. This enables the implementation of an instantaneous, zero-latency state manager using a simple global dictionary, providing a significant performance advantage without any additional infrastructure, a crucial trade-off in a competitive hackathon.34
+
+2.2 LLM Integration: The Agentic Router as the Central Nervous System
+
+The core of the assistant's intelligence will be an LLM-powered agent that routes user requests to the appropriate tool.
+Recommendation: Use the LangChain framework to implement an agent that leverages Function Calling (or Tool Calling) capabilities of a modern LLM.15 LangChain is better suited for this task than alternatives like LlamaIndex because its primary strength lies in orchestrating complex, multi-step workflows and integrating multiple tools, which is the central challenge of this project.15
+The implementation follows a clear sequence:
+Define Tools: Implement each core capability (e.g., run_sql_query, perform_rag_search, find_similar_images) as a distinct Python function or class method.
+Describe Tools with Schemas: For each tool, create a detailed schema (typically a JSON object or a well-formatted docstring) that describes its purpose, its parameters (including their names, types, and descriptions), and which parameters are required.27 The quality and clarity of these descriptions are paramount, as they are the primary information the LLM uses to make its routing decisions.
+Initialize the Agent: Instantiate a LangChain agent (e.g., an OpenAI Functions Agent) and provide it with the LLM and the list of defined tools with their schemas.
+Execute the Agent: When a user query is received, it is passed to the agent. The LLM analyzes the query in the context of the available tool descriptions and generates a structured JSON output specifying which tool to call and with what arguments. The application code then parses this JSON and executes the corresponding function.
+
+2.3 Prompt Engineering for Competitive Edge
+
+While the agentic framework provides the structure, the quality of the prompts determines the quality of the outcome. The following are specific, battle-tested prompt strategies for the key scenarios in this hackathon.
+
+Prompt Strategy for Product Comparison (Scenario 5)
+
+To generate a high-quality, structured comparison, the prompt must guide the LLM through a logical process and enforce a specific output format.
+Technique: This prompt combines Few-Shot Prompting to provide a clear example of the desired output, Chain-of-Thought (CoT) reasoning to encourage a structured analytical process, and explicit formatting instructions.36
+Template:
+System: You are an expert product analyst. Your task is to compare two products based on the provided information. First, think step-by-step to identify the key comparison criteria. Then, present your comparison in a markdown table with columns for 'Feature', 'Product A', 'Product B', and 'Verdict'. Conclude with a brief summary of which product is better for which type of user.
+
+---
+EXAMPLE 1
+Context:
+Product A: iPhone 15 - 6.1" screen, A16 Bionic chip, 48MP main camera.
+Product B: iPhone 15 Pro - 6.1" screen, A17 Pro chip, 48MP main camera with ProRAW support, Action button.
+
+User: Compare the iPhone 15 and iPhone 15 Pro.
+
+Assistant:
+Chain of Thought:
+1. Identify comparison criteria: Screen size, Chip, Camera features, Special features.
+2. Compare each criterion: Screen is the same. A17 Pro is more powerful than A16. Camera on Pro has more features (ProRAW). Pro has the Action button.
+3. Formulate verdict for each.
+4. Structure as a markdown table.
+5. Write summary.
+
+Comparison:
+
+
+
+Feature
+iPhone 15
+iPhone 15 Pro
+Verdict
+Chip
+A16 Bionic
+A17 Pro
+Pro is significantly faster, better for gaming.
+Camera
+48MP Main
+48MP Main + ProRAW
+Pro offers more control for photographers.
+Special Features
+-
+Action Button
+Pro has a customizable shortcut button.
+
+
+
+
+Summary: The iPhone 15 Pro is better for power users and photographers who will leverage the faster chip and advanced camera features. The iPhone 15 is an excellent choice for everyday use.
+---
+CONTEXT:
+{retrieved_product_A_info}
+{retrieved_product_B_info}
+
+USER:
+{user_query}
+
+ASSISTANT:
+```
+
+
+
+Prompt Strategy for Conversational Search (Scenario 4)
+
+For multi-turn dialogue, the prompt must establish the agent's persona and provide clear rules for when to seek clarification versus when to act.
+Technique: This prompt uses Role Prompting to define the assistant's behavior and provides explicit, rule-based instructions to guide its decision-making process for asking clarifying questions.37
+Template:
+System: You are a friendly and helpful AI Shopping Assistant. Your goal is to help users find the perfect product. If the user's request is vague or ambiguous, your primary task is to ask clarifying questions to narrow down their needs. Only use the search tool when you have enough specific information (e.g., product type and at least one key feature or price range).
+
+RULES for asking questions:
+- If product type is missing, ask for it.
+- If the user mentions a subjective quality (e.g., "good", "cheap", "powerful"), ask for specific criteria (e.g., "What's your budget?", "What will you use it for?").
+- Offer options when possible (e.g., "Are you looking for a laptop for gaming, work, or casual use?").
+
+---
+USER:
+{chat_history}
+User: {user_query}
+
+ASSISTANT:
+
+
+
+2.4 Database Interaction: A Hybrid Strategy for Precision and Discovery
+
+A single approach to data interaction is insufficient for the varied query types in this project. RAG excels at semantic discovery, while Text-to-SQL provides factual precision. A hybrid approach that leverages both is necessary.
+Recommendation: Implement both a Text-to-SQL tool and a RAG tool, and let the agentic router decide which to use based on the user's query.
+When to use Text-to-SQL: This tool is for queries that require precision, filtering, and aggregation on structured data fields (product_id, price, stock_quantity, seller_id, category). It ensures that factual questions receive factually correct answers, something RAG cannot guarantee.40
+When to use RAG: This tool is for queries that rely on understanding the semantic meaning of unstructured text in the product_name and description fields. It is ideal for discovery-based and subjective queries where the user is exploring options rather than asking for a specific fact.42
+Implementation:
+RAG Tool: During setup, create vector embeddings from the product_name and description columns of the product table. Store these embeddings in a simple, file-based vector store like FAISS for maximum speed and minimal setup. The tool's function will take a text query, perform a similarity search in the FAISS index, and retrieve the full details of the top-matching products from the main database.
+Text-to-SQL Tool: Utilize LangChain's built-in SQL Agent functionality. To initialize it, provide the agent with the database connection and the database schema. Including a few examples of natural language questions and their corresponding correct SQL queries in the agent's prompt (few-shot prompting) will significantly improve its accuracy.
+The following table clarifies the strategic division of labor between these two essential tools.
+Query Type
+Example Scenario
+Best Tool
+Justification
+Factual Lookup
+"What is the price of product with ID 123?" (Scenario 2)
+Text-to-SQL
+Guarantees precision for structured data. RAG might hallucinate or misinterpret numerical values.
+Filtered Search
+"Show me products under $50." (Scenario 3)
+Text-to-SQL
+Reliably handles numerical comparisons (<, >, =) and filtering, which is difficult for semantic search.
+Aggregation
+"How many products does Seller X have?" (Implied)
+Text-to-SQL
+Can perform SQL operations like COUNT, AVG, SUM. RAG cannot perform calculations.
+Semantic Search
+"Find a blue shirt for summer." (Scenario 1)
+RAG
+Understands the meaning and context of "for summer" by searching on product descriptions. Text-to-SQL relies on exact keyword matches.
+Discovery
+"I need a gift for a tech enthusiast." (Implied)
+RAG
+Excels at open-ended, discovery-based queries where the user doesn't know exactly what they're looking for.
+
+
+2.5 Handling Multi-Modal Input: An API-First Strategy for Scenarios 6 & 7
+
+Given the constraint of not self-hosting models, we will pivot to a strategy that exclusively uses the OpenAI Vision API. This approach is highly effective and eliminates the need for a GPU, making it ideal for a serverless deployment.
+
+Recommendation for Object Identification (Scenario 6)
+
+The goal is to identify the main object in an image. This is a direct use case for a vision-language model's descriptive capabilities.
+Tool: Use an OpenAI Vision model (e.g., gpt-4o-mini or gpt-4-turbo) via the Chat Completions API.
+Implementation:
+Tool Definition: Create a tool that accepts a base64-encoded image string as input.
+API Call: The tool's function will make a call to the OpenAI API, providing the image and a simple, direct prompt.
+Prompt: "Describe the main object in this image in a short phrase."
+Result: The tool returns the model's text response, which is then placed in the message field of the final JSON output. This is a fast, reliable, and resource-light solution.
+
+Recommendation for Image-based Product Search (Scenario 7)
+
+This scenario requires finding a product in the database that matches a user's image. Instead of a complex image-to-image similarity search, we will implement a clever and efficient two-step "caption-then-search" workflow.
+Tool: This workflow combines a vision tool with the existing RAG tool.
+Implementation:
+Step 1: Generate a Detailed Description. The agent first calls a vision tool (which can be the same one from Scenario 6, but with a different prompt) to analyze the user's image.
+Prompt: "Provide a detailed description of the product in this image, including its type, color, style, and any notable features. This description will be used to search a product database."
+Output: A rich text description (e.g., "A modern, black leather office chair with chrome armrests and a high back").
+Step 2: Perform Semantic Search. The agent takes the text description generated in Step 1 and passes it as the input query to the existing RAG tool.
+Result: The RAG tool performs a semantic search against the product names and descriptions in the database and returns the base_random_key of the best match. This elegant approach reuses existing components, avoids the need for image embeddings, and perfectly aligns with the project's constraints.
+
+2.6 State Management: Lightweight and Effective for Multi-Turn Dialogue
+
+For a monolithic application in a hackathon, a complex external state management system is unnecessary. A simple in-memory solution is both faster and easier to implement.
+Recommendation: Use a Python dictionary as an in-memory session store, combined with a sliding window approach to manage the length of the conversation history passed to the LLM.33
+Implementation:
+Session Store: In the main application file, initialize a global dictionary: chat_sessions = {}.
+On Request: When a request arrives with a chat_id, use chat_sessions.get(chat_id,) to retrieve the existing history or start a new one.
+Update History: After each turn, append the user's message and the assistant's response to the session's list. For example: chat_sessions[chat_id].append({"role": "user", "content": user_message}).
+Sliding Window: Before constructing the prompt for the LLM, truncate the history to the last N messages (e.g., N=10). This is as simple as recent_history = full_history[-10:]. This prevents the context window from overflowing, controls API costs, and keeps the context focused on the most recent part of the conversation.34
+
+2.7 Minimum Viable Deployment (MVD): Docker on a Serverless Platform
+
+A successful hackathon submission must be deployed and accessible. A serverless container platform provides the ideal balance of scalability, ease of management, and rapid deployment.
+Recommendation: Containerize the FastAPI application using Docker and deploy it to a serverless platform like the suggested HamRavesh, or common alternatives like Google Cloud Run or AWS Lambda with container support.44
+Step-by-Step Deployment Guide:
+Create a .env file: For local development, create a .env file in your project root to store all API keys, database connection strings, and other secrets. Ensure this file is listed in your .gitignore to prevent committing it to version control.
+Create a Dockerfile: Start with an official slim Python base image (e.g., python:3.11-slim). Copy the requirements.txt file and install dependencies. Then, copy the rest of the application source code. The final CMD instruction should use uvicorn to run the FastAPI application, binding to a port specified by an environment variable (e.g., $PORT) for compatibility with the hosting platform.47
+Build and Test Locally: Run docker build -t my-assistant. to build the image. Then, run docker run -p 8000:8080 -e PORT=8080 --env-file.env my-assistant to test the containerized application locally, ensuring all environment variables from your .env file are correctly loaded.
+Push to a Container Registry: Authenticate with a container registry (e.g., Docker Hub, Google Artifact Registry, Amazon ECR) and push the image: docker push your-repo/my-assistant:latest.49
+Deploy to Serverless Platform: In the cloud provider's console or via its CLI, create a new serverless service. Configure it to use the container image just pushed to the registry. Set any necessary environment variables (like API keys for LLMs) in the service configuration section, mirroring the keys from your local .env file. Configure the service to be publicly accessible to receive an HTTPS endpoint for the API.51
+
+2.8 Evaluation and Iteration: A Strategy for Winning the Leaderboard
+
+The limited number of 10 judging attempts means that each submission must be of high quality. All primary debugging and iteration must happen locally using a disciplined evaluation process.
+Core Principle: The leaderboard is for validation, not for debugging.
+Step 1: Build a Local Evaluation Harness:
+Framework: Use a specialized LLM evaluation framework like deepeval, which integrates seamlessly with Pytest and is designed for testing AI systems.53
+Golden Dataset: Systematically go through the project's FAQ and all seven scenarios. For each one, create a corresponding deepeval.LLMTestCase. This test case should include the input query, the expected_output (the ideal answer), and any retrieval_context or other metadata needed for evaluation. This collection of test cases becomes the "golden dataset" for regression testing.55
+Metrics: Configure deepeval to use a suite of relevant metrics:
+GEval: Use this for custom, criteria-based evaluations. For example, for the product comparison scenario, the criteria could be: "The response must be a markdown table comparing the products on at least three distinct features".53
+RAG Metrics: For RAG-related test cases, use built-in metrics like AnswerRelevancy (is the answer relevant to the query?) and Faithfulness (is the answer supported by the retrieved context?) to ensure the RAG tool is performing correctly.53
+Step 2: The Disciplined Iteration Loop:
+Baseline Run: After building the first version of the agent, run the entire local evaluation suite using the command deepeval test run. This will provide a baseline performance score.
+Isolate and Fix: Analyze the failed test cases. The modular, tool-based architecture makes this easier. If a Text-to-SQL test fails, write a specific unit test that calls only the SQL tool and asserts its output. This isolates the problem to a specific prompt, tool description, or piece of logic.
+Refine and Re-run: Tweak the relevant component—be it a prompt template, a tool's schema description, or the agent's logic. After making a change, re-run the entire local test suite to check for regressions. A change that fixes one scenario might break another.
+Submit to Leaderboard: Only after achieving a high pass rate (e.g., >90%) on the local "golden dataset" should a submission to the official leaderboard be considered.
+Analyze and Hypothesize: If a submission fails on the hidden test set, analyze the score and the scenarios that were likely tested. Formulate a hypothesis about the type of edge case that might have caused the failure (e.g., "The router is likely confusing requests for product descriptions with requests for product comparisons"). Create a new local test case that embodies this hypothesis, add it to the golden dataset, and repeat the loop from step 2.
+This disciplined, test-driven approach maximizes the information gained from each of the 10 precious leaderboard attempts and systematically improves the agent's robustness against a wide range of inputs.
+
+Note: No scenario-specific heuristics; rely on LLM tool-calling. Only health checks may be rule-based.

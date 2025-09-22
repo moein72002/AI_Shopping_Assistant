@@ -1,0 +1,45 @@
+---
+alwaysApply: true
+---
+
+# Project Rules: Navigating the Documentation
+
+This document outlines the purpose of each key markdown file in the repository. Use this guide to quickly find the information you need.
+
+-   **Agent Development Rule (Mutable)**
+    -   **Rule**: Update mutable MDC files (like `plan.mdc` or `architecture.mdc`) if needed to make sure that new behaviors or strategies are documented and consistently applied.
+
+-   **`task_description.mdc` (Immutable)**
+    -   **Content**: The official hackathon problem statement. It details the project goal, API specifications, evaluation criteria, and all 10 competition scenarios.
+    -   **When to use**: This is the **source of truth**. Refer to it for any questions about API endpoints, response formats, or the specifics of a scenario.
+
+-   **Agent Interaction Rule (Mutable)**
+    -   **Rule**: "Continue based on our plan. Tell me if I need to do something."
+
+-   **`FAQ.mdc` (Immutable)**
+    -   **Content**: A list of frequently asked questions about the hackathon logistics, rules, and technical constraints (e.g., deadlines, OpenAI credit, deployment).
+    -   **When to use**: For questions about the competition rules, not the technical implementation.
+
+-   **`tips_and_tricks.mdc` (Immutable)**
+    -   **Content**: Official tips from the organizers regarding deployment on HamRavesh, managing OpenAI credits, and general architectural advice.
+    -   **When to use**: For guidance on platform-specific issues and resource management.
+
+-   **`db_tables.mdc`**
+    -   **Content**: The complete database schema. It describes all tables, columns, and their meanings.
+    -   **When to use**: When you need to understand the data structure, especially when constructing SQL queries for the `DatabaseTool`.
+
+-   **`guidelines.mdc`**
+    -   **Content**: A high-level strategic document. It analyzes the core AI problems in the hackathon and recommends architectural patterns (Monolith, RAG, Text-to-SQL, Agentic Router).
+    -   **When to use**: To understand the *why* behind the chosen architecture and the overall strategy.
+
+-   **`architecture.mdc`**
+    -   **Content**: A detailed description of the system's architecture. It outlines the monolithic FastAPI structure, the agentic intent router, and the specific Python modules (`main.py`, `tools/`, etc.).
+    -   **When to use**: To understand *how* the system is structured and how the different components interact. Use this as a blueprint for code generation and refactoring.
+
+-   **`plan.mdc`**
+    -   **Content**: A step-by-step development plan, broken down into three sprints. It maps specific development tasks to the competition scenarios.
+    -   **When to use**: To understand the project timeline, what has been implemented, and what the next steps are.
+
+-   **`report.mdc`**
+    -   **Content**: A template for the final project report and a script for the 5-minute video presentation. It summarizes the architecture, features, and challenges.
+    -   **When to use**: To structure the final presentation and report. It also contains example `pytest` tests.

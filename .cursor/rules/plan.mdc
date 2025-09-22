@@ -1,0 +1,130 @@
+---
+alwaysApply: true
+---
+
+## 📝 `plan.mdc`: The Complete Development Plan
+
+This document provides a step-by-step plan to build your AI Shopping Assistant from scratch. Follow these sprints in order to build a robust and competitive solution.
+
+### **Sprint 0: Project Setup & Sanity Check**
+
+**Goal:** Establish a working base, set up the development environment, and pass the simplest evaluation scenario.
+
+1.  **Environment Setup**:
+
+      * Initialize a Git repository. We recommend HamGit as suggested.
+      * Set up your Python environment (e.g., using `venv` or `conda`).
+      * Install and manage packages using `uv`. To install the dependencies for this project, run: `uv pip sync requirements.txt`.
+      * Install core libraries: `fastapi`, `uvicorn`, `pydantic`, `python-dotenv`, and `requests`.
+      * Create a `.env` file and add your `OPENAI_API_KEY` and the Torob proxy URL. Use a library like `python-dotenv` to load these into your application.
+      * Create a `.gitignore` file to exclude `.env`, `__pycache__`, and other non-essential files.
+
+2.  **Basic FastAPI App**:
+
+      * Create a `main.py` file.
+      * Set up a basic FastAPI application.
+      * Implement the `/chat` endpoint according to the API specification. Use Pydantic models for request and response validation.
+
+3.  **Implement Scenario 0 (Sanity Check)**:
+
+      * Hardcode the exact responses required ("pong", returning the base key, returning the member key). This requires no AI.
+
+4.  **Local Testing for Scenario 0**:
+      * Write `pytest` tests to verify the hardcoded responses for Scenario 0.
+      * Add a test to verify the `OPENAI_API_KEY` by making a simple API call.
+      * Always run the tests locally to ensure correctness before deployment.
+
+5.  **First Deployment**:
+
+      * Write a `Dockerfile` for your application.
+      * Deploy the application to HamRavesh. This ensures your deployment pipeline is working early.
+      * Submit your domain to the judge and verify that you pass Scenario 0.
+
+-----
+
+### **Sprint 1: The RAG & Text-to-SQL Core**
+
+**Goal:** Handle structured and unstructured queries about products. This sprint tackles the core value proposition.
+
+1.  **Data Loading & Preprocessing**:
+
+      * Write a script (`load_data.py`) to read the provided CSV/JSON data into a local SQLite database. This is faster and more efficient for queries than reading from files every time.
+      * Combine relevant text fields for each product (e.g., `persian_name`, `english_name`, `extra_features`) into a single "document" for embedding.
+
+2.  **Build the `DatabaseTool` (Text-to-SQL)**:
+
+      * This tool will handle questions that require precise lookups or aggregations (e.g., "What is the price?", "How many sellers?").
+      * **Functionality**: Takes a natural language question about a product, uses an LLM to generate a SQL query, executes it against your SQLite database, and returns the result.
+      * **Prompting**: Use a prompt that includes the database schema and the user's question to guide the LLM.
+
+3.  **Build the `VectorSearchTool` (RAG)**:
+
+      * This tool will handle semantic search queries (e.g., "I want a fancy red mug," "Find me a phone for gaming").
+      * **Functionality**:
+          * **Offline part**: Create embeddings for all your product "documents" using OpenAI's `text-embedding-3-small` model. Store these embeddings in a vector index file using `faiss`.
+          * **Online part**: Takes a user query, creates an embedding for it, and searches the `faiss` index for the most similar product embeddings. Returns the `base_random_keys` of the top matches.
+
+4.  **Implement Scenarios 1, 2, 3, 8, & 9**:
+
+      * Integrate the new tools into your main application logic (see `architecture.md` for the "Intent Router" pattern). The router will decide whether a user's query should go to the `DatabaseTool` or the `VectorSearchTool`.
+      * **Scenario 1 & 9 (Product Search/Ranking)**: Route to `VectorSearchTool`.
+      * **Scenario 2 & 3 (Specific Feature/Price Questions)**: Route to `DatabaseTool`.
+      * **Scenario 8 (Similar Products)**: First, use `VectorSearchTool` to find the initial product, then use its embedding to find other similar vectors in your `faiss` index.
+
+-----
+
+### **Sprint 2: Adding Vision & Conversation**
+
+**Goal:** Make the assistant multi-modal and capable of holding a conversation.
+
+1.  **Build the `VisionTool` (OpenAI Vision API)**:
+
+      * This tool handles image-based queries. **You will not be hosting any models**.
+      * **Functionality**:
+          * For **Scenario 6 (What is this?)**: Takes a `base64` image, sends it to the `gpt-4-vision-preview` model with a prompt like "Describe the main object in this image in one short sentence." Returns the text description.
+          * For **Scenario 7 (Find this product)**: This is a two-step process. First, send the image to `gpt-4-vision-preview` with a prompt like "Provide a detailed, text-only description of this product for a search engine." Then, take the resulting text description and feed it into your existing `VectorSearchTool` from Sprint 1.
+
+2.  **Implement State Management**:
+
+      * **Goal**: Remember the conversation history for multi-turn dialogues like Scenario 4.
+      * **Implementation**: Create a simple in-memory Python dictionary to store chat history. The key will be the `chat_id` and the value will be a list of messages. For a hackathon, this is sufficient. You don't need a complex database like Redis.
+
+3.  **Tackle Scenario 4 (Conversational Search)**:
+
+      * When the Intent Router detects an ambiguous initial query (e.g., "I need a heater"), it should trigger a conversational mode.
+      * The LLM should be prompted to ask clarifying questions. Its prompt must include the chat history.
+      * With each user response, append the conversation to the history and re-evaluate if you have enough information to use the `VectorSearchTool` to find a specific product.
+
+4.  **Tackle Scenario 5 (Product Comparison)**:
+
+      * The Intent Router identifies the two products mentioned.
+      * Use the `DatabaseTool` to fetch the structured `extra_features` for both products.
+      * Feed these features into a final LLM call with a prompt like: "Compare Product A features: {features\_A} with Product B features: {features\_B}. Based on the user's goal '{user\_goal}', which is better and why?"
+
+-----
+
+### **Sprint 3: Final Polish & Evaluation**
+
+**Goal:** Refine the system, add the translation layer, and rigorously test before the deadline.
+
+1.  **Implement the Translation Layer**:
+
+      * Add a middleware component in your FastAPI app.
+      * **On Request**: Before any processing, translate the incoming Persian `content` to English.
+      * **On Response**: After generating the final English `message`, translate it back to Persian before sending it to the user.
+      * **Tip**: You can use a free, lightweight translation library for the hackathon, but be mindful of rate limits. An API-based solution is more robust.
+
+2.  **Local Evaluation**:
+
+      * Use the `report.md` testing guide to build a local evaluation script.
+      * This will save your 10 official judging attempts. Run this script every time you make a significant change.
+
+3.  **Refinement & Prompt Engineering**:
+
+      * Review the traces from your local tests. Where does the agent fail?
+      * Refine your prompts. Add examples (few-shot prompting), improve instructions, or adjust the context you provide to the LLM. This is often the highest-impact activity before the deadline.
+
+4.  **Final `report.md` and Video**:
+
+      * Update your `report.md` with the final architecture and features.
+      * Use the `report.md` as a script or storyboard to record your 5-minute presentation video.

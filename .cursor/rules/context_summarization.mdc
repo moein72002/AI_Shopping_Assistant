@@ -1,0 +1,25 @@
+## Context Summarization Rule (Minimal, High-Signal)
+
+Purpose: Keep chat/system context lean and cheap while preserving critical information for decision making.
+
+Guidelines:
+- Summarize only the most important facts relevant to the current request in ≤5 bullet points.
+- Prefer concrete outcomes (tests passed/failed, key errors, files changed, active config, env flags) over process details.
+- Omit exploratory steps, stack traces, and transient dependency churn unless directly actionable for the next step.
+- Include: current blocker (if any), last successful state, critical file edits, pending todos, and explicit next action.
+- Cap summaries to ~60–90 words; use bullets with bold keywords.
+
+When to summarize:
+- After major state change (tests now pass/fail, dependency graph fixed, deployment ready).
+- Before starting a new scenario or deployment step to set clear context.
+
+Example (good):
+- **State**: All API tests pass (5/5). 
+- **Key edits**: `main.py` router (rule-based width + code), deferred OpenAI imports.
+- **Deps**: httpcore/distro added; env loads via dotenv.
+- **Blockers**: None.
+- **Next**: Build Docker image and run locally.
+
+Example (avoid):
+- Long chronological narratives; repeated errors that are now fixed; irrelevant logs.
+

@@ -1,0 +1,250 @@
+---
+alwaysApply: true
+---
+
+**Problem Definition**
+
+In the second stage of the hackathon, we want to create an AI Shopping Assistant that responds to various user requests. Each user may interact with the agent with a specific goal in mind. For example, they might be looking for an answer to a question, searching for a specific product, or something else. You need to create a smart shopping assistant that interacts with the user via chat and ultimately helps them achieve their goal faster.
+
+The task of deploying the project is entirely your responsibility, and there are no limitations on the programming language or technologies used. Each person will be given a one-million-toman HamRavesh gift code, which they can use to deploy their code on HamRavesh clusters.
+
+**Competition Data**
+
+`You can check ./db_tables.md for details about the database structure. In addition, all database data are available in the ./db_data/ folder.`
+
+**API Format**
+
+Your agent must implement the following endpoint.
+
+**/chat endpoint**
+
+This endpoint is the communication channel for users with your agent. The competition judge will send requests to this endpoint using the `POST` method.
+
+**Request Format**
+
+The request sent to this endpoint must be in the form of a `JSON` object with the following structure:
+
+**Main request structure:**
+
+```json
+{
+  "chat_id": "string",
+  "messages": [
+    {
+      "type": "string",
+      "content": "string"
+    }
+  ]
+}
+```
+
+**Field descriptions:**
+
+  * `chat_id` field (string, required): A unique identifier for each chat session, used for identifying and tracking the chat.
+  * `messages` field (array of objects, required): A list of messages sent by the user. Each message is an object with the following structure:
+      * `type` field (string, required): Specifies the type of the message. This field can only have one of the following two values:
+          * `"text"`: For text messages.
+          * `"image"`: For image messages.
+      * `content` field (string, required): The content of the message.
+          * If `type` is `"text"`, this field contains the text of the message.
+          * If `type` is `"image"`, this field contains a `base64-encoded` string of the image.
+
+**Response Format**
+
+The response of this endpoint will be in the form of a `JSON` object with the following structure:
+
+**Main response structure:**
+
+```json
+{
+  "message": "string",
+  "base_random_keys": ["string"],
+  "member_random_keys": ["string"]
+}
+```
+
+**Field descriptions:**
+
+  * `message` field (string, optional): The text response to be displayed to the user. This field can be `null` in some cases.
+  * `base_random_keys` field (array of strings, optional): A list of random keys related to base products that may be used in the response. This field can be `null`. The maximum length of the list must be 10. (This field should be populated when the user is looking for a specific product.)
+  * `member_random_keys` field (array of strings, optional): A list of random keys related to member products. This field can also be `null`. The maximum length of the list must be 10. (This field should be populated when the user is looking for a specific seller.)
+
+**Example of /chat endpoint**
+
+**Sample Request**
+
+```json
+{
+  "chat_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+  "messages": [
+    {
+      "type": "text",
+      "content": "سلام، یک گوشی آیفون ۱۶ پرومکس میخوام"
+    }
+  ]
+}
+```
+
+*(Translator's note: The Persian content translates to "Hello, I want an iPhone 16 Pro Max")*
+
+**Sample Response**
+
+After processing the request, the system returns a confirmation message along with the random keys related to the base product.
+
+```json
+{
+  "message": "این گوشی رو به شما پیشنهاد میکنم.",
+  "base_random_keys": ["awsome-gooshi-rk"],
+  "member_random_keys": null
+}
+```
+
+*(Translator's note: The Persian message translates to "I recommend this phone to you.")*
+
+**Evaluation Method**
+
+Everyone must fully deploy their own code and send us a domain. The domain must have a `chat` endpoint that functions according to the description above.
+
+This competition has a public leaderboard and a private leaderboard. Throughout the competition, you can request via the competition panel for us to send a request to the domain you have provided. The way your assistant responds to these requests will determine the public leaderboard.
+
+The requests we send to your service on the last day of the competition (September 26th) will be different (the question scenarios will be similar, but the exact input will not be the same), and the results of these requests will determine the private leaderboard.
+
+Additionally, to be considered for judging, you must complete the following tasks:
+* Create and submit a 5-minute video at the end of the project covering the architecture, challenges, implemented features, etc.
+* Provide access to your code repository on Hemgit to the account `recruiter@torob.ir`.
+
+Subsequently, based on the results of this evaluation, a number of teams will advance to the interview stage. In the online interview stage, we will conduct a 30-minute interview with the top participants, and ultimately, the final top participants will be determined.
+
+***
+
+## **Evaluation Scenarios**
+
+The scenarios considered for the competition are as follows. At the beginning of the competition, only the judge for scenario one is active, and subsequently, the judges for other questions will be activated and announced.
+
+### **Scenario Zero**
+This scenario is designed to ensure the judge is correctly connected to the service.
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "sanity-check-ping", "messages": [ { "type": "text", "content": "ping" } ] }` | `{ "message": "pong", "base_random_keys": null, "member_random_keys": null }` |
+| `{ "chat_id": "sanity-check-base-key", "messages": [ { "type": "text", "content": "return base random key: 123e4567-e89b-12d3-a456-426614174000" } ] }` | `{ "message": null, "base_random_keys": ["123e4567-e89b-12d3-a456-426614174000"], "member_random_keys": null }` |
+| `{ "chat_id": "sanity-check-member-key", "messages": [ { "type": "text", "content": "return member random key: abc-def-123" } ] }` | `{ "message": null, "base_random_keys": null, "member_random_keys": ["abc-def-123"] }` |
+
+**Note:** The input format is exactly as specified, and the output format is exactly as specified, but the `random_key` values may differ.
+* **Activation Date:** September 15th
+* **Points:** 50
+
+***
+
+### **Scenario One**
+**Input:** The user is looking for a specific product from Torob (the user's query can be mapped exactly to a Torob base).
+**Output:** In a single step, the base random key should be provided in the output (in the `base_random_keys` section).
+**Example:**
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "q1-abc", "messages": [ { "type": "text", "content": "لطفاً دراور چهار کشو (کد D14) را برای من تهیه کنید." } ] }` | `{ "message": null, "base_random_keys": ["bmubxu"], "member_random_keys": null }` |
+
+**Note:** In this question, `base_random_keys` must have at most one result.
+* **Activation Date:** September 16th
+* **Points:** 150
+
+***
+
+### **Scenario Two**
+**Input:** The user is looking for a specific feature of a specific product from Torob (the user's query can be mapped exactly to a Torob base).
+**Output:** In a single step, return the value of the requested feature for that product (in the `message` section).
+**Example:**
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "q2-abc", "messages": [ { "type": "text", "content": "عرض پارچه تریکو جودون 1/30 لاکرا گردباف نوریس به رنگ زرد طلایی چقدر است؟" } ] }` | `{ "message": "1.18 meter", "base_random_keys": null, "member_random_keys": null }` |
+
+**Note:** It is not necessary to return exactly the value "1.18 meter" in the response. Values like `"1.18 متر"`, `"عرض پارچه ۱.۱۸ متر است."`, and `"۱۱۸ سانتی‌متر"` are also acceptable.
+* **Activation Date:** September 16th
+* **Points:** 150
+
+***
+
+### **Scenario Three**
+**Input:** The user has a question about the sellers of a specific base from Torob (the user's query can be mapped exactly to a Torob base).
+**Output:** In a single step, answer the user's question (in the `message` section).
+**Example:**
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "q3-abc", "messages": [ { "type": "text", "content": "کمترین قیمت در این پایه برای گیاه طبیعی بلک گلد بنسای نارگل کد ۰۱۰۸ چقدر است؟" } ] }` | `{ "message": "275000", "base_random_keys": null, "member_random_keys": null }` |
+
+**Note:** The output must be parsable as an `int` or `float` (depending on the question's requirement).
+* **Activation Date:** September 16th
+* **Points:** 200
+
+***
+
+### **Scenario Four**
+**Goal:** The user is looking for a specific product, but the initial query cannot be linked to a specific product. The assistant must help the user reach their goal by asking questions.
+**Output:** The assistant has a maximum of 5 steps to chat with the user. In the end, the assistant must place the desired product in the `member_random_keys` section. (The judge will terminate the process whenever this is done).
+**Example:**
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "q4-abc", "messages": [ { "type": "text", "content": "ن دنبال یه میز تحریر هستم که برای کارهای روزمره و نوشتن مناسب باشه. می‌خواستم بدونم آیا می‌تونید به من کمک کنید تا یه فروشنده خوب پیدا کنم؟ ممنون می‌شم اگه راهنمایی کنید." } ] }` | `{ "message": null, "base_random_keys": null, "member_random_keys": ["xpjtgd"]}` |
+
+**Note:** As is clear, the product cannot be reached directly from the initial query. However, based on the specifications of products in the electric heater category, the agent should ask a series of questions to eventually arrive at the desired product. For example, "Do you want one with a fan or without?", "What wattage do you want?", "What brand do you want?", etc. Note that in this question, the judge knows what it wants but does not state it directly in the initial prompt.
+**Note 2:** Ultimately, in this question, `member_random_keys` must have at most one result.
+* **Activation Date:** September 18th
+* **Points:** 300
+
+***
+
+### **Scenario Five**
+**Input:** Comparison of two or more specific bases (the user's query can be mapped exactly to two bases) for a specific application.
+**Output:** In a single step, it must say exactly which product is better and why.
+**Example:**
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "q5-abc", "messages": [ { "type": "text", "content": "کدام یک از این ماگ‌های خرید ماگ-لیوان هندوانه فانتزی و کارتونی کد 1375 یا ماگ لته خوری سرامیکی با زیره کد 741 دارای سبک کارتونی و فانتزی بوده و برای کودکان یا نوجوانان مناسب‌تر است؟" } ] }` | `{ "message": "چون طراحی کارتونی و فانتزی دارد که برای افراد جوان‌تر یا کسانی که از محیط‌های شاد و غیررسمی لذت می‌برند، جذابیت بیشتری دارد.", "base_random_keys": ["hhtgaa"], "member_random_keys": null }` |
+
+
+**Note:** Ultimately, in this question, `base_random_keys` must have at most one result, and the reason for the choice must be explained in the `message`.
+* **Activation Date:** September 18th
+* **Points:** 200
+
+***
+
+### **Scenario Six**
+**Goal:** The user wants to know what the main object in an image is. There may be several objects in the image, but you must answer based on the product information.
+**Output:** Tell the user the main object or subject in the image.
+
+| ورودی (Request) | خروجی (Response) |
+| :--- | :--- |
+| `{ "chat_id": "q5-abc", "messages": [ { "type": "text", "content": "شیء و مفهوم اصلی در تصویر چیست؟" }, { "type": "image", "content": "data:image/jpeg;base64,<image-base64>" } ] }` | `{ "message": "صندلی", "base_random_keys": null, "member_random_keys": null }` |
+
+
+* **Activation Date:** September 18th
+* **Points:** 100
+
+***
+
+### **Scenario Seven**
+**Goal:** The user is looking for the base corresponding to a specific image (the image maps to a specific base).
+**Output:** The base random key should be provided in the output (in the `base_random_keys` section).
+* **Activation Date:** September 18th
+* **Points:** 250
+
+***
+
+### **Scenario Eight**
+**Goal:** The user provides a query that maps to a specific product on Torob and wants similar products.
+**Output:** We provide the user with a list of random keys for products similar to their query (in the `base_random_keys` section).
+* **Activation Date:** September 20th (if needed)
+* **Points:** 300
+
+***
+
+### **Scenario Nine**
+**Goal:** The user provides a query that maps to several products on Torob, and we must return a good ranking of products to the user.
+**Output:** We show the user the top ranking (in the `base_random_keys` section).
+* **Activation Date:** September 20th (if needed)
+* **Points:** 300

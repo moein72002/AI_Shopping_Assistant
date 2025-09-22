@@ -1,0 +1,14 @@
+
+---
+description:
+globs:
+alwaysApply: true
+---
+
+From now on, I will write my request in the my_reuquests.mdc. Check my requests and answer or do them. Then delete completed requests from my_reuquests.mdc
+
+Write a Challenges.mdc and how we solved them. Make sure to update it in the future.
+
+My server has only 1GB of RAM, is it enough to run all of our functionalities?
+
+What does .index_checkpoints/ directory contains?

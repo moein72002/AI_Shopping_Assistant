@@ -1,0 +1,22 @@
+# Ignore virtual environment
+venv/
+__pycache__/
+
+# Ignore environment file
+.env
+
+# Ignore data loading scripts
+scripts/
+
+# Ignore database file
+torob.db
+
+db_data/
+
+*.faiss
+
+*.faiss.json
+
+.index_checkpoints/
+
+*.zip

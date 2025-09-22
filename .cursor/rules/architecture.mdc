@@ -1,0 +1,165 @@
+---
+alwaysApply: true
+---
+
+## 🏛️ `architecture.mdc`: System Architecture
+
+This document describes the architecture of the AI Shopping Assistant. It's designed to be a reference for development and for the Cursor AI agent.
+
+### **High-Level Overview**
+
+The system is a **monolithic FastAPI application** that processes user requests through a series of components. It follows a **Tool-Based Agent** architecture, where a central Large Language Model (LLM) acts as an "Intent Router" or "brain," deciding which specialized tool to use based on the user's query.
+
+**Data Flow:**
+
+1.  **API Layer (`main.py`)**: Receives the raw `POST` request at the `/chat` endpoint.
+2.  **Translation Layer**: Translates the incoming Persian text to English.
+3.  **State Manager**: Retrieves chat history for the given `chat_id`.
+4.  **Intent Router (LLM)**: Receives the current query and chat history. It decides which tool to call (`VectorSearchTool`, `DatabaseTool`, `VisionTool`, or just respond).
+5.  **Tool Execution**: The chosen tool runs its logic (e.g., queries the vector DB, generates SQL, calls the Vision API).
+6.  **Response Generation**: The output from the tool is used to formulate a final response.
+7.  **Translation Layer**: The final English response message is translated back to Persian.
+8.  **API Layer**: The final JSON response is sent back to the user.
+
+### **Component Breakdown**
+
+1.  **`main.py` (API Layer)**
+
+      * **Framework**: FastAPI.
+      * **Responsibility**: Defines the `/chat` endpoint, handles HTTP requests and responses, and uses Pydantic models for data validation. It orchestrates the calls to other components.
+
+2.  **`translation.py` (Translation Layer)**
+
+      * **Responsibility**: Provides two functions: `translate_to_english(text)` and `translate_to_persian(text)`. This abstracts the translation logic.
+      * **Technology**: Can be implemented using a library like `googletrans` or by making direct API calls.
+
+3.  **`state_manager.py` (State Manager)**
+
+      * **Responsibility**: Manages conversational context.
+      * **Implementation**: A simple Python dictionary (`chat_histories = {}`) where keys are `chat_id`s. This is an in-memory solution, perfect for the hackathon's scope.
+
+4.  **`intent_router.py` (LLM Agent Core)**
+
+      * **Responsibility**: The "brain" of the operation. It determines the user's intent.
+      * **Technology**: OpenAI API (e.g., `gpt-4o`).
+      * **How it works**: It uses **Function Calling**. You define the available tools (e.g., `get_product_by_semantic_search`, `answer_question_from_database`) as functions with clear docstrings. You send the user query to the LLM along with these function definitions. The LLM's response will indicate which function to call and with what arguments.
+
+5.  **`tools/` (The Toolkit)**
+
+      * **`vector_search_tool.py`**:
+          * **Purpose**: Handles semantic search (Scenarios 1, 7, 8, 9).
+          * **Technology**: OpenAI `text-embedding-3-small` for creating embeddings and `faiss` for the local vector index.
+      * **`database_tool.py`**:
+          * **Purpose**: Handles structured queries (Scenarios 2, 3).
+          * **Technology**: Python's `sqlite3` library and an LLM call for Text-to-SQL generation.
+      * **`vision_tool.py`**:
+          * **Purpose**: Handles image inputs (Scenarios 6, 7).
+          * **Technology**: OpenAI `gpt-4-vision-preview` API. It does **not** load any models locally.
+
+-----
+
+### **Extra Suggestions for Developing with Cursor AI**
+
+Leverage Cursor to its full potential to accelerate your development:
+
+1.  **Context-Aware Chat**: Use `@` to provide context.
+
+      * When working on a tool, type `@tools/vector_search_tool.py` in the chat to make Cursor aware of its contents.
+      * To get high-level guidance, provide the architecture file: "**`@architecture.md`** a new user query is 'I want a cheap blue shirt'. Which tool should the intent router call and why?"
+
+2.  **Code Generation**:
+
+      * **Boilerplate**: "Generate a Pydantic model for the `/chat` request based on the hackathon docs."
+      * **Functions from Scratch**: "**`@architecture.md`** Generate the python code for the `database_tool.py` component. It should have a single function that takes a natural language query, gets the database schema, and uses an LLM to generate and execute a SQL query."
+
+3.  **Debugging and Refactoring**:
+
+      * **Error Analysis**: Paste a traceback into the chat and ask, "Why am I getting this error?"
+      * **Code Cleanup**: Select a complex function and ask Cursor to "Refactor this code for clarity and add comments."
+
+4.  **Test Generation**:
+
+      * "Write a `pytest` unit test for the `translate_to_english` function in **`@translation.py`**."
+
+By using these strategies, you can let Cursor handle the boilerplate and focus on the core logic and prompt engineering, which are the keys to winning the hackathon.## 🏛️ `architecture.md`: System Architecture
+
+This document describes the architecture of the AI Shopping Assistant. It's designed to be a reference for development and for the Cursor AI agent.
+
+### **High-Level Overview**
+
+The system is a **monolithic FastAPI application** that processes user requests through a series of components. It follows a **Tool-Based Agent** architecture, where a central Large Language Model (LLM) acts as an "Intent Router" or "brain," deciding which specialized tool to use based on the user's query.
+
+**Data Flow:**
+
+1.  **API Layer (`main.py`)**: Receives the raw `POST` request at the `/chat` endpoint.
+2.  **Translation Layer**: Translates the incoming Persian text to English.
+3.  **State Manager**: Retrieves chat history for the given `chat_id`.
+4.  **Intent Router (LLM)**: Receives the current query and chat history. It decides which tool to call (`VectorSearchTool`, `DatabaseTool`, `VisionTool`, or just respond).
+5.  **Tool Execution**: The chosen tool runs its logic (e.g., queries the vector DB, generates SQL, calls the Vision API).
+6.  **Response Generation**: The output from the tool is used to formulate a final response.
+7.  **Translation Layer**: The final English response message is translated back to Persian.
+8.  **API Layer**: The final JSON response is sent back to the user.
+
+### **Component Breakdown**
+
+1.  **`main.py` (API Layer)**
+
+      * **Framework**: FastAPI.
+      * **Responsibility**: Defines the `/chat` endpoint, handles HTTP requests and responses, and uses Pydantic models for data validation. It orchestrates the calls to other components.
+
+2.  **`translation.py` (Translation Layer)**
+
+      * **Responsibility**: Provides two functions: `translate_to_english(text)` and `translate_to_persian(text)`. This abstracts the translation logic.
+      * **Technology**: Can be implemented using a library like `googletrans` or by making direct API calls.
+
+3.  **`state_manager.py` (State Manager)**
+
+      * **Responsibility**: Manages conversational context.
+      * **Implementation**: A simple Python dictionary (`chat_histories = {}`) where keys are `chat_id`s. This is an in-memory solution, perfect for the hackathon's scope.
+
+4.  **`intent_router.py` (LLM Agent Core)**
+
+      * **Responsibility**: The "brain" of the operation. It determines the user's intent.
+      * **Technology**: OpenAI API (e.g., `gpt-4o`).
+      * **How it works**: It uses **Function Calling**. You define the available tools (e.g., `get_product_by_semantic_search`, `answer_question_from_database`) as functions with clear docstrings. You send the user query to the LLM along with these function definitions. The LLM's response will indicate which function to call and with what arguments.
+
+5.  **`tools/` (The Toolkit)**
+
+      * **`vector_search_tool.py`**:
+          * **Purpose**: Handles semantic search (Scenarios 1, 7, 8, 9).
+          * **Technology**: OpenAI `text-embedding-3-small` for creating embeddings and `faiss` for the local vector index.
+      * **`database_tool.py`**:
+          * **Purpose**: Handles structured queries (Scenarios 2, 3).
+          * **Technology**: Python's `sqlite3` library and an LLM call for Text-to-SQL generation.
+      * **`vision_tool.py`**:
+          * **Purpose**: Handles image inputs (Scenarios 6, 7).
+          * **Technology**: OpenAI `gpt-4-vision-preview` API. It does **not** load any models locally.
+
+-----
+
+### **Extra Suggestions for Developing with Cursor AI**
+
+Leverage Cursor to its full potential to accelerate your development:
+
+1.  **Context-Aware Chat**: Use `@` to provide context.
+
+      * When working on a tool, type `@tools/vector_search_tool.py` in the chat to make Cursor aware of its contents.
+      * To get high-level guidance, provide the architecture file: "**`@architecture.md`** a new user query is 'I want a cheap blue shirt'. Which tool should the intent router call and why?"
+
+2.  **Code Generation**:
+
+      * **Boilerplate**: "Generate a Pydantic model for the `/chat` request based on the hackathon docs."
+      * **Functions from Scratch**: "**`@architecture.md`** Generate the python code for the `database_tool.py` component. It should have a single function that takes a natural language query, gets the database schema, and uses an LLM to generate and execute a SQL query."
+
+3.  **Debugging and Refactoring**:
+
+      * **Error Analysis**: Paste a traceback into the chat and ask, "Why am I getting this error?"
+      * **Code Cleanup**: Select a complex function and ask Cursor to "Refactor this code for clarity and add comments."
+
+4.  **Test Generation**:
+
+      * "Write a `pytest` unit test for the `translate_to_english` function in **`@translation.py`**."
+
+By using these strategies, you can let Cursor handle the boilerplate and focus on the core logic and prompt engineering, which are the keys to winning the hackathon.
+
+Note: No scenario-specific heuristics; rely on LLM tool-calling. Only health checks may be rule-based.

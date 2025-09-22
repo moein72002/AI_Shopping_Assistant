@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+---
+
+**Hamravash Tips**
+
+**How do I create a new app?**
+If you are not familiar with the Hamravash platform, first watch this video. Also, the Hamravash docs explain the process of creating an app well.
+
+**What can I do to prevent my Hamravash credits from running out quickly?**
+When creating a new app, always be sure to set the resources to the minimum possible. Later, by checking the "Resource Consumption" tab for the desired app in Darkube, if you observe that the service resources are low, you can increase the system's resources from the "Resource Management" section.
+
+**What can I do to prevent others from sending requests to my service?**
+For this purpose, you can select the "Enable Authentication" option for your service in the "Domain Address" section and then register the address containing a user/pass in the competition panel.
+For example:
+`https://user:pass@your-app-name.darkube.app`
+
+**What should I do if my Hamravash credit runs out?**
+Based on our assessment, the gifted credit is sufficient for the 10-day duration of the competition. However, if your credit runs out, you can submit your request by contacting the competition support via Telegram at @torobTurbo.
+
+***
+
+**OpenAI Tips**
+
+**What can I do to prevent my OpenAI credits from running out quickly?**
+Pay attention to the following points:
+* Be sure to log the requests you send to the AI. You can use free services like Logfire or similar services for this purpose.
+* Make sure your assistant does not get stuck in an infinite loop and talk to the judge indefinitely.
+* It's a good idea to set up a mechanism so that if the TCP connection with the competition judge is terminated (the request is canceled), you also stop the ongoing processes of your assistant.
+
+**What should I do if my OpenAI credit runs out?**
+Based on our assessment, the provided credit is sufficient for 10 tests by the judge and your local tests. However, if your credit runs out, you can submit your request by contacting the competition support via Telegram at @torobTurbo. (To maintain fairness in the competition, we will either give credit to everyone or to no one.)
+
+***
+
+**Architecture Tips**
+
+**What should the service architecture be like?**
+In general, try to first implement the simplest thing that comes to your mind (zero scenario), and then gradually make your assistant smarter. As one of the initial tasks, be sure to save the logs of requests made to you somewhere. And check what requests are being sent to your service. Then, based on these requests, you should develop different tools for your assistant to help it generate better answers.
