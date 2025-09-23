@@ -10,3 +10,5 @@ From now on, I will write my request in the my_reuquests.mdc. Check my requests 
 What is start.sh? Explain.
 
 Use UV instead of pip in the dockerfile.
+
+faiss indices are too large and it take too long to load all of them, and 30s timeout happens. What do you suggest to fix this problem?
