@@ -9,6 +9,8 @@ import json
 from typing import Dict, List as _List
 from datetime import datetime
 import logging
+import subprocess
+import sys
 
 # --- Logging Setup ---
 # Create a logger
@@ -119,13 +121,23 @@ async def admin_page():
         # Short preview of last message
         msgs = (entry.get("request_body", {}) or {}).get("messages", [])
         preview = msgs[-1].get("content", "-") if msgs else "-"
+        # Short preview of response
+        resp = entry.get("response_body", {})
+        if isinstance(resp, dict):
+            resp_msg = resp.get("message")
+            brk = resp.get("base_random_keys") or []
+            mrk = resp.get("member_random_keys") or []
+            resp_preview = resp_msg or (f"base={brk[:3]}" if brk else "") or (f"member={mrk[:3]}" if mrk else "-")
+        else:
+            resp_preview = str(resp)[:120]
+
         rows_html.append(
-            f"<tr><td>{ts}</td><td>{status}</td><td>{path}</td><td>{chat_id}</td><td>{preview}</td></tr>"
+            f"<tr><td>{ts}</td><td>{status}</td><td>{path}</td><td>{chat_id}</td><td>{preview}</td><td>{resp_preview}</td></tr>"
         )
 
     table_html = (
         "<table border='1' cellpadding='6' cellspacing='0'>"
-        "<thead><tr><th>Timestamp</th><th>Status</th><th>Path</th><th>Chat ID</th><th>Last Query</th></tr></thead>"
+        "<thead><tr><th>Timestamp</th><th>Status</th><th>Path</th><th>Chat ID</th><th>Last Query</th><th>Response</th></tr></thead>"
         f"<tbody>{''.join(rows_html)}</tbody>"
         "</table>"
     )
@@ -143,6 +155,28 @@ async def admin_page():
 
     return HTMLResponse(content=html)
 
+@app.on_event("startup")
+async def maybe_download_kaggle_dataset():
+    """If torob.db is missing and Kaggle creds are present at runtime, download the dataset."""
+    try:
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "torob.db")
+        if os.path.exists(db_path):
+            return
+        if os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"):
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "download_data_scripts", "download_data_from_kaggle.py")
+            if os.path.exists(script_path):
+                # Run the downloader
+                subprocess.run([sys.executable, script_path], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                # Move produced DB into root if created in shopping_dataset/
+                produced = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shopping_dataset", "torob.db")
+                if os.path.exists(produced):
+                    try:
+                        os.replace(produced, db_path)
+                    except Exception:
+                        pass
+    except Exception as _:
+        # Non-fatal; app should still run
+        pass
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -280,7 +314,7 @@ async def chat(request: ChatRequest):
         }
         model_messages = [system_message] + (history[-10:])
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             messages=model_messages,
             tools=tools,
             tool_choice="auto",
