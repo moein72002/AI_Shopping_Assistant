@@ -5,14 +5,6 @@ globs:
 alwaysApply: true
 ---
 
-From now on, I will write my request in the my_reuquests.mdc. Check my requests and answer or do them. Then delete completed requests from my_reuquests.mdc. Add this description to project rules about this mdc file.
+From now on, I will write my request in the my_reuquests.mdc. Check my requests and answer or do them. Then delete completed requests from my_reuquests.mdc.
 
-Write a Challenges.mdc and how we solved them. Make sure to update it in the future based on every important challange.
-
-My server has only 1GB of RAM, is it enough to run all of our functionalities?
-
-What does .index_checkpoints/ directory contains?
-
-Use Python 3.13.
-
-I think it is better to add some or all of the tests to run when using Dockerfile to make sure that the app is working properly and OpenAI API key is correct.
+I want 

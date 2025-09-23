@@ -1,16 +1,7 @@
 ### AI Shopping Assistant – Conversation Summary
 
-- **Architecture**: Monolithic FastAPI app with an intelligent, LLM-driven intent router. Key tools include a `VectorSearchTool` (with a hybrid keyword/semantic search strategy) and a `DatabaseTool` (Text-to-SQL).
-- **Dependencies**: The `requirements.txt` file has been updated with fully pinned, explicit versions for all packages to ensure a stable and reproducible environment. The project is standardized on using `uv` for package management.
-- **Testing**: A **correctness-driven testing** philosophy has been established. The tests in `tests/test_api.py` have been rewritten to validate the agent's responses against the SQLite database, ensuring factual accuracy.
-- **Current Blocker**: The test suite is blocked by a persistent, low-level `OSError: [WinError 10106]` that occurs when `pytest-xprocess` attempts to launch the `uvicorn` server on Windows. This error seems related to the `asyncio` event loop and is preventing the API tests from running.
-
-### Initial Prompt for New Chat
-
-Here is the prompt for your new chat to continue development:
-
-> You are continuing work on the Torob AI Shopping Assistant. The application's core logic (LLM router, hybrid search) is implemented and the dependencies are now fully pinned.
-> **Current Blocker:** The test suite is blocked by a persistent `OSError` that prevents the `uvicorn` server from starting within `pytest`.
-> **Your primary goal:** Debug the server startup issue, get the correctness tests for Scenarios 1 & 2 passing, and then proceed with the development plan.
-> **Start by** attempting to run the `uvicorn` server directly from the command line to isolate the problem from `pytest`.
-> Load context from `conversation_summary.mdc`, `architecture.mdc`, and `plan.mdc`.
+- **State**: FastAPI app with LLM tool-calling router; simple in-memory chat history for Scenario 4. Tools exposed: `vector_search`, `get_product_by_code`, `get_product_feature`, `get_min_price_by_product_name`, `text_to_sql`.
+- **Tests**: Local suite passes for sanity and DB-backed checks (8/8 earlier). After removing code heuristics, Scenarios 1–2 became model-choice dependent; we strengthened the system prompt to steer tool selection while keeping LLM-driven logic.
+- **Docker**: Minimal image (python:3.11-slim), `.dockerignore` trims context; container responds on 8090.
+- **Docs**: Added summarization rule; appended policy: “No scenario-specific heuristics; rely on LLM tool-calling. Only health checks may be rule-based.” Created `Challenges.mdc`.
+- **Next**: Ensure Docker build supports Kaggle download for `torob.db` via secrets; optionally add lightweight test step in Docker build.

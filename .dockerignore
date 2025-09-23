@@ -8,6 +8,8 @@
 !torob.db
 !tools
 !tools/**
+!tests
+!tests/**
 
 # Include the folder and script needed for the data download
 !download_data_scripts/
