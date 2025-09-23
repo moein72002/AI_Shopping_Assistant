@@ -2,7 +2,7 @@
 # This stage's only job is to provide a context for torob.db if it exists.
 # If torob.db does not exist in the build context, the build will not fail.
 FROM busybox:latest AS db_prepper
-# COPY torob.db /data/
+COPY torob.db /data/
 
 # --- Stage 2: Main Application ---
 FROM python:3.13-slim
