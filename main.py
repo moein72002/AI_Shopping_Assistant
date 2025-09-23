@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -6,13 +7,70 @@ import os
 import re
 import json
 from typing import Dict, List as _List
-# Defer tool imports to avoid startup errors
-# from tools.database_tool import text_to_sql
-# from tools.vector_search_tool import vector_search
+from datetime import datetime
+import logging
+
+# --- Logging Setup ---
+# Create a logger
+logger = logging.getLogger("api_logger")
+logger.setLevel(logging.INFO)
+
+# Create a file handler
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requests.log")
+handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
+handler.setLevel(logging.INFO)
+
+# Create a logging format
+formatter = logging.Formatter('%(message)s')
+handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', None) == handler.baseFilename for h in logger.handlers):
+    logger.addHandler(handler)
+# --- End Logging Setup ---
+
 
 load_dotenv()
 
 app = FastAPI()
+
+# --- Logging Middleware ---
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    log_data = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "client_ip": request.client.host,
+        "method": request.method,
+        "path": request.url.path,
+    }
+
+    # Only log request body for /chat endpoint
+    if request.url.path == "/chat":
+        try:
+            body = await request.json()
+            log_data["request_body"] = body
+        except json.JSONDecodeError:
+            log_data["request_body"] = "Invalid JSON"
+
+    response = await call_next(request)
+
+    # A bit of a workaround to get the response body from a StreamingResponse
+    response_body = b""
+    async for chunk in response.body_iterator:
+        response_body += chunk
+    
+    log_data["status_code"] = response.status_code
+    try:
+        log_data["response_body"] = json.loads(response_body)
+    except json.JSONDecodeError:
+        log_data["response_body"] = response_body.decode('utf-8', errors='ignore')
+
+    logger.info(json.dumps(log_data))
+    
+    # We need to create a new response because the body_iterator has been consumed
+    return Response(content=response_body, status_code=response.status_code, headers=dict(response.headers))
+# --- End Logging Middleware ---
+
 
 # --- Simple in-memory state (sliding window) ---
 chat_histories: Dict[str, _List[dict]] = {}
@@ -36,10 +94,65 @@ async def root():
     return {"status": "ok"}
 
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page():
+    # Render a simple HTML page with recent logs so it works on the same port
+    try:
+        with open(LOG_PATH, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception:
+        lines = []
+
+    # Show most recent first
+    lines = list(reversed(lines))
+
+    rows_html = []
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        ts = entry.get("timestamp", "-")
+        path = entry.get("path", "-")
+        status = entry.get("status_code", "-")
+        chat_id = (entry.get("request_body", {}) or {}).get("chat_id", "-")
+        # Short preview of last message
+        msgs = (entry.get("request_body", {}) or {}).get("messages", [])
+        preview = msgs[-1].get("content", "-") if msgs else "-"
+        rows_html.append(
+            f"<tr><td>{ts}</td><td>{status}</td><td>{path}</td><td>{chat_id}</td><td>{preview}</td></tr>"
+        )
+
+    table_html = (
+        "<table border='1' cellpadding='6' cellspacing='0'>"
+        "<thead><tr><th>Timestamp</th><th>Status</th><th>Path</th><th>Chat ID</th><th>Last Query</th></tr></thead>"
+        f"<tbody>{''.join(rows_html)}</tbody>"
+        "</table>"
+    )
+
+    html = (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        "<title>API Request Logs</title>"
+        "<meta http-equiv='refresh' content='5'>"
+        "<style>body{font-family:Arial,Helvetica,sans-serif;padding:16px} table{width:100%; border-collapse:collapse} th{background:#f5f5f5}</style>"
+        "</head><body>"
+        "<h2>API Request Logs</h2>"
+        + (table_html if rows_html else "<p>No logs yet.</p>")
+        + "</body></html>"
+    )
+
+    return HTMLResponse(content=html)
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     # Import tools here to ensure dependencies are loaded on-demand
-    from tools.database_tool import text_to_sql, get_product_by_code, get_product_feature
+    from tools.database_tool import (
+        text_to_sql, 
+        get_product_by_code, 
+        get_product_feature,
+        get_min_price_by_product_name
+    )
     from tools.vector_search_tool import vector_search
     from openai import OpenAI
 
@@ -151,9 +264,9 @@ async def chat(request: ChatRequest):
             "role": "system",
             "content": (
                 "You are a friendly AI Shopping Assistant. \n"
-                "Rules: \n"
-                "- Always call exactly one tool to act; do not answer without a tool unless asking a clarifying question. \n"
-                "- If the query mentions a product code like '(کد D14)' or similar, call get_product_by_code with the code. \n"
+                "Your MOST IMPORTANT rule is to check if the user query contains a product code like '(کد D14)'. If it does, you MUST call the `get_product_by_code` tool with that code. \n"
+                "Example: User says '... (کد D14) ...', you MUST call `get_product_by_code(product_code='(کد D14)')`. \n"
+                "Other Rules: \n"
                 "- If the user asks for a specific feature value (e.g., 'عرض ... چقدر است؟'), call get_product_feature with product_name and feature_name. \n"
                 "- If the user asks for minimum price (e.g., 'کمترین قیمت ... چقدر است؟'), call get_min_price_by_product_name. \n"
                 "- Otherwise use vector_search for discovery or ranking. \n"
@@ -178,7 +291,7 @@ async def chat(request: ChatRequest):
                 "vector_search": vector_search,
                 "get_product_by_code": get_product_by_code,
                 "get_product_feature": get_product_feature,
-                "get_min_price_by_product_name": lambda **kwargs: __import__("tools.database_tool", fromlist=["get_min_price_by_product_name"]).get_min_price_by_product_name(**kwargs),
+                "get_min_price_by_product_name": get_min_price_by_product_name,
                 "text_to_sql": text_to_sql,
             }
             tool_call = tool_calls[0]
@@ -189,6 +302,9 @@ async def chat(request: ChatRequest):
             if function_name == "vector_search":
                 results = function_to_call(query=function_args.get("query"))
                 return ChatResponse(base_random_keys=results)
+            elif function_name == "get_product_by_code":
+                result = function_to_call(product_code=function_args.get("product_code"))
+                return ChatResponse(base_random_keys=[result] if result else [])
             elif function_name == "get_product_feature":
                 result = function_to_call(
                     product_name=function_args.get("product_name"),

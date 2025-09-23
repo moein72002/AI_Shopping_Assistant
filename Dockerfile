@@ -22,6 +22,8 @@ COPY download_data_scripts/download_data_from_kaggle.py ./
 
 # Copy the rest of the application files
 COPY main.py ./
+COPY admin_ui.py ./
+COPY start.sh ./
 COPY tools ./tools
 COPY tests ./tests
 
@@ -42,4 +44,6 @@ RUN pip install pytest requests python-dotenv && pytest tests/test_api.py::test_
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+RUN chmod +x ./start.sh
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -7,4 +7,6 @@ alwaysApply: true
 
 From now on, I will write my request in the my_reuquests.mdc. Check my requests and answer or do them. Then delete completed requests from my_reuquests.mdc.
 
-I want 
+What is start.sh? Explain.
+
+Use UV instead of pip in the dockerfile.

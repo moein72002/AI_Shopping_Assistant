@@ -6,6 +6,8 @@
 !requirements.txt
 !download_data.sh
 !main.py
+!admin_ui.py
+!start.sh
 !torob.db
 !tools
 !tools/**
