@@ -4,6 +4,7 @@
 # Include only what the image needs
 !.dockerignore
 !requirements.txt
+!download_data.sh
 !main.py
 !torob.db
 !tools

@@ -19,17 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the Kaggle download script
 COPY download_data_scripts/download_data_from_kaggle.py ./
 
-# Attempt Kaggle download if build secret is provided; otherwise skip
-RUN --mount=type=secret,id=kaggle_env \
-    sh -c 'if [ -f /run/secrets/kaggle_env ]; then \
-      echo "Kaggle secret detected. Downloading dataset..." && \
-      python download_data_from_kaggle.py && \
-      mv ./shopping_dataset/torob.db ./torob.db; \
-    else \
-      echo "ERROR: No kaggle_env secret found. Set build secret to download torob.db." 1>&2; \
-      exit 1; \
-    fi'
-# --- END MODIFIED SECTION ---
 
 # Copy the rest of the application files
 COPY main.py ./
