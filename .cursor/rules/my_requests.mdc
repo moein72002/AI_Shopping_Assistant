@@ -14,3 +14,5 @@ My server has only 1GB of RAM, is it enough to run all of our functionalities?
 What does .index_checkpoints/ directory contains?
 
 Use Python 3.13.
+
+I think it is better to add some or all of the tests to run when using Dockerfile to make sure that the app is working properly and OpenAI API key is correct.

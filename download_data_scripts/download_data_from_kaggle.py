@@ -1,20 +1,33 @@
-# download_data_from_kaggle.py
-
 import os
 from dotenv import load_dotenv
 
-# --- CRITICAL STEP ---
-# Load environment variables from the .env file FIRST.
-load_dotenv()
+# --- MODIFIED SECTION ---
+# This makes the script work both locally and inside Docker with secrets.
+secret_path = "/run/secrets/kaggle_env"
+if os.path.exists(secret_path):
+    # Running inside Docker with a build secret
+    print("Docker secret file found. Loading credentials...")
+    load_dotenv(dotenv_path=secret_path)
+else:
+    # Running locally, load from a local .env file
+    print("Loading credentials from local .env file...")
+    load_dotenv()
+
+# NEW: Explicitly check if the environment variables are now set
+kaggle_username = os.getenv('KAGGLE_USERNAME')
+kaggle_key = os.getenv('KAGGLE_KEY')
+
+if not kaggle_username or not kaggle_key:
+    raise ValueError("Kaggle credentials not found in environment! "
+                     "Ensure your .env file is correctly formatted and mounted as a secret during the build.")
+
+print("Kaggle credentials loaded successfully.")
 
 # Now, import Kaggle. It will find the environment variables.
 import kaggle
-
-# --------------------
+# --- END MODIFIED SECTION ---
 
 print("Authenticating with Kaggle...")
-# The KaggleApi class will now automatically use the loaded environment variables.
-# An explicit authenticate() call is good practice to confirm it works.
 api = kaggle.KaggleApi()
 api.authenticate()
 print("Authentication successful.")
@@ -22,8 +35,6 @@ print("Authentication successful.")
 # --- Configuration ---
 dataset_slug = 'moeinmadadi/ai-shopping-assistant-db'
 download_path = './shopping_dataset'
-
-# Create the target directory if it doesn't exist
 os.makedirs(download_path, exist_ok=True)
 
 # --- Download and Unzip ---
