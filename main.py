@@ -200,7 +200,7 @@ async def chat(request: ChatRequest):
     from openai import OpenAI
 
     chat_id = request.chat_id
-
+    
     # Scenario 0: Content-based health checks (chat_id can be random)
     try:
         last_msg = request.messages[-1]
@@ -327,8 +327,6 @@ async def chat(request: ChatRequest):
             messages=model_messages,
             tools=tools,
             tool_choice="auto",
-            temperature=0,
-            top_p=0,
         )
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
