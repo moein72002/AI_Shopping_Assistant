@@ -8,10 +8,10 @@ __pycache__/
 # Ignore data loading scripts
 scripts/
 
-# Ignore database file
-torob.db
 
 db_data/
+
+*.db
 
 *.faiss
 

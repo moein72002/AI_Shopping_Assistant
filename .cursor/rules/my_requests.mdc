@@ -12,3 +12,5 @@ Write a Challenges.mdc and how we solved them. Make sure to update it in the fut
 My server has only 1GB of RAM, is it enough to run all of our functionalities?
 
 What does .index_checkpoints/ directory contains?
+
+Use Python 3.13.

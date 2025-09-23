@@ -10,11 +10,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
 
 WORKDIR /app
 
-# Install deps separately for better cache utilization
+# Install deps. Make sure requirements.txt includes "kaggle" and "python-dotenv"
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy only required application files
+# --- MODIFIED SECTION ---
+# Copy the download script from its subfolder into the image's WORKDIR
+COPY download_data_scripts/download_data_from_kaggle.py ./
+
+# Run the script to download the data using a build secret.
+# This command doesn't change because the script was copied into the WORKDIR.
+RUN --mount=type=secret,id=kaggle_env \
+    python download_data_from_kaggle.py
+
+# Move the downloaded database to the app's root directory
+RUN mv ./shopping_dataset/torob.db ./torob.db
+# --- END MODIFIED SECTION ---
+
+# Copy the rest of the application files
 COPY main.py ./
 COPY tools ./tools
 COPY torob.db ./torob.db
