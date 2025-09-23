@@ -157,19 +157,23 @@ async def chat(request: ChatRequest):
     from openai import OpenAI
 
     chat_id = request.chat_id
-    
-    if chat_id == "sanity-check-ping":
-        return ChatResponse(message="pong")
-    
-    if chat_id == "sanity-check-base-key":
-        content = request.messages[0].content
-        base_key = content.replace("return base random key: ", "")
-        return ChatResponse(base_random_keys=[base_key])
-        
-    if chat_id == "sanity-check-member-key":
-        content = request.messages[0].content
-        member_key = content.replace("return member random key: ", "")
-        return ChatResponse(member_random_keys=[member_key])
+
+    # Scenario 0: Content-based health checks (chat_id can be random)
+    try:
+        last_msg = request.messages[-1]
+        if last_msg.type == "text":
+            txt = (last_msg.content or "").strip()
+            lowered = txt.lower()
+            if lowered == "ping":
+                return ChatResponse(message="pong")
+            if lowered.startswith("return base random key:"):
+                base_key = txt.split(":", 1)[1].strip() if ":" in txt else txt[len("return base random key:"):].strip()
+                return ChatResponse(base_random_keys=[base_key])
+            if lowered.startswith("return member random key:"):
+                member_key = txt.split(":", 1)[1].strip() if ":" in txt else txt[len("return member random key:"):].strip()
+                return ChatResponse(member_random_keys=[member_key])
+    except Exception:
+        pass
 
     user_query = request.messages[-1].content
 
