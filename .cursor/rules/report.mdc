@@ -135,3 +135,57 @@ def test_scenario_5_comparison():
     
     assert llm_judge(question, agent_response, expected) == True
 ```
+
+### **How to Run Locally**
+
+Follow these instructions to run the AI Shopping Assistant on your local machine.
+
+#### **Prerequisites**
+
+1.  **Python 3.11+**: Ensure you have Python installed.
+2.  **Poetry**: This project uses `uv` for dependency management.
+3.  **Environment File**: Create a `.env` file in the project root and add your credentials:
+    ```
+    OPENAI_API_KEY="sk-..."
+    TOROB_PROXY_URL="https://torob-proxy-url.com/v1"
+    KAGGLE_USERNAME="your-kaggle-username"
+    KAGGLE_KEY="your-kaggle-api-key"
+    ```
+4. **Dataset**: Run `python download_data_scripts/download_data_from_kaggle.py` to get `torob.db`
+
+#### **1. Running with Uvicorn (for development)**
+
+This method is recommended for local development as it provides auto-reloading.
+
+```bash
+## activate venv
+source .venv/bin/activate
+
+# Install dependencies
+uv pip sync requirements.txt
+
+# Run the FastAPI server
+uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+The API will be available at `http://localhost:8080`.
+
+#### **2. Running with Docker**
+
+This method packages the application into a container, simulating a production deployment.
+
+```bash
+# 1. Build the Docker image
+docker build -t my-app-api-only .
+
+# 2. Run the Docker container
+# This command mounts your local .env file into the container
+docker run --rm -p 8080:8080 --env-file .env my-app-api-only
+```
+
+# 
+```bash
+python scripts/play_chat.py --chat-id "scenario-3-test-5" --message "hello"
+```
+
+The containerized API will be available at `http://localhost:8080`.

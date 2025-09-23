@@ -48,6 +48,10 @@ This document outlines the purpose of each key markdown file in the repository. 
     -   **Content**: The user's prioritized request list. Each item is an actionable instruction for the agent.
     -   **When to use**: Treat as the authoritative backlog for the coding session. After completing an item, remove it from `my_requests.mdc` (or mark done) and proceed to the next.
 
+-   **`model_notes.mdc` (Immutable)**
+    -   **Content**: Records specific limitations or behaviors of the LLMs being used (e.g., unsupported parameters).
+    -   **When to use**: Before making LLM calls, to ensure you are using a compatible API signature.
+
 
 Important Rules:
 - When using API key make sure that the cost of running is not over $0.10 in total.

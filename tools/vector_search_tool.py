@@ -2,6 +2,9 @@ import json
 import os
 import sqlite3
 
+# --- Lazy-loading cache for FAISS indexes and mappings ---
+_index_cache = {}
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INDEX_PATH = os.path.join(PROJECT_ROOT, "vector_index.faiss")
 NAMES_INDEX_PATH = os.path.join(PROJECT_ROOT, "vector_index_names.faiss")
@@ -10,6 +13,23 @@ DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
 # The global mapping file is now gone, so these paths point to the specific mappings
 FULL_MAPPING_PATH = os.path.join(PROJECT_ROOT, "vector_index.faiss.json")
 NAMES_MAPPING_PATH = os.path.join(PROJECT_ROOT, "vector_index_names.faiss.json")
+
+
+def _load_faiss_assets(index_path, mapping_path, cache_key):
+    """Loads a FAISS index and its key mapping into the cache."""
+    import faiss
+    if cache_key not in _index_cache:
+        print(f"Loading FAISS index '{cache_key}' into memory...")
+        try:
+            index = faiss.read_index(index_path)
+            with open(mapping_path, 'r', encoding='utf-8') as f:
+                keys = json.load(f)
+            _index_cache[cache_key] = (index, keys)
+            print("...loading complete.")
+        except Exception as e:
+            print(f"Failed to load FAISS assets for '{cache_key}': {e}")
+            _index_cache[cache_key] = (None, None) # Cache failure to avoid retries
+    return _index_cache.get(cache_key)
 
 
 def get_embedding(text, model="text-embedding-3-small"):
@@ -88,6 +108,7 @@ def _faiss_search(index_path: str, query_vector, top_k: int):
 def vector_search(query: str, k: int = 5):
     """
     Dual-retrieval with dedicated mappings and reciprocal rank fusion.
+    Uses a lazy-loaded cache for FAISS indexes to improve performance.
     """
     try:
         # Step 1: Attempt a direct keyword search for precision
@@ -104,30 +125,26 @@ def vector_search(query: str, k: int = 5):
         candidates: dict[str, float] = {}
 
         # Full-text index search
-        if os.path.exists(INDEX_PATH) and os.path.exists(FULL_MAPPING_PATH):
+        full_index, full_keys = _load_faiss_assets(INDEX_PATH, FULL_MAPPING_PATH, "full")
+        if full_index and full_keys:
             try:
-                with open(FULL_MAPPING_PATH, 'r', encoding='utf-8') as f:
-                    full_keys = json.load(f)
-                
-                _, idxs = _faiss_search(INDEX_PATH, query_vector, max(k, 20))
-                for rank, i in enumerate(idxs):
+                _, idxs = full_index.search(query_vector, max(k, 20))
+                for rank, i in enumerate(idxs[0]):
                     if 0 <= i < len(full_keys):
                         rk = full_keys[i]
-                        candidates[rk] = candidates.get(rk, 0.0) + 1.0 / (rank + 60) # RRF with k=60
+                        candidates[rk] = candidates.get(rk, 0.0) + 1.0 / (rank + 60) # RRF
             except Exception as e:
                 print(f"Error searching full index: {e}")
 
         # Names-only index search
-        if os.path.exists(NAMES_INDEX_PATH) and os.path.exists(NAMES_MAPPING_PATH):
+        names_index, names_keys = _load_faiss_assets(NAMES_INDEX_PATH, NAMES_MAPPING_PATH, "names")
+        if names_index and names_keys:
             try:
-                with open(NAMES_MAPPING_PATH, 'r', encoding='utf-8') as f:
-                    names_keys = json.load(f)
-
-                _, idxs_n = _faiss_search(NAMES_INDEX_PATH, query_vector, max(k, 20))
-                for rank, i in enumerate(idxs_n):
+                _, idxs_n = names_index.search(query_vector, max(k, 20))
+                for rank, i in enumerate(idxs_n[0]):
                     if 0 <= i < len(names_keys):
                         rk = names_keys[i]
-                        candidates[rk] = candidates.get(rk, 0.0) + 1.0 / (rank + 60) # RRF with k=60
+                        candidates[rk] = candidates.get(rk, 0.0) + 1.0 / (rank + 60) # RRF
             except Exception as e:
                 print(f"Error searching names index: {e}")
 

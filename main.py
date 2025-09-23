@@ -98,11 +98,15 @@ async def root():
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page():
+    print("\n--- [ADMIN] Admin page requested ---")
     # Render a simple HTML page with recent logs so it works on the same port
     try:
+        print(f"[ADMIN] Attempting to read log file at: {LOG_PATH}")
         with open(LOG_PATH, "r", encoding="utf-8") as f:
             lines = f.readlines()
-    except Exception:
+        print(f"[ADMIN] Successfully read {len(lines)} lines from log file.")
+    except Exception as e:
+        print(f"[ADMIN] ERROR reading log file: {e}")
         lines = []
 
     # Show most recent first
@@ -153,6 +157,7 @@ async def admin_page():
         + "</body></html>"
     )
 
+    print("[ADMIN] Successfully generated HTML. Sending response.")
     return HTMLResponse(content=html)
 
 @app.on_event("startup")
@@ -280,7 +285,7 @@ async def chat(request: ChatRequest):
             "type": "function",
             "function": {
                 "name": "get_min_price_by_product_name",
-                "description": "Returns the minimum price among member products for a base matched by product name.",
+                "description": "Gets the absolute lowest price for a product from all sellers. Use this when the user asks for the 'minimum price', 'lowest price', or 'cheapest price'.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -311,11 +316,17 @@ async def chat(request: ChatRequest):
             "role": "system",
             "content": (
                 "You are a friendly AI Shopping Assistant. \n"
-                "Your MOST IMPORTANT rule is to check if the user query contains a product code like '(کد D14)'. If it does, you MUST call the `get_product_by_code` tool with that code. \n"
+                "Rule Priority: Your main goal is to answer the user's specific question. If a query contains both a product identifier (like a code) and a question about a feature (like price or width), you MUST prioritize answering the feature question. \n"
+                "--- \n"
+                "1. **Product Code Rule**: If the user's query ONLY asks to find a product and provides a code like '(کد D14)', call `get_product_by_code`. \n"
                 "Example: User says '... (کد D14) ...', you MUST call `get_product_by_code(product_code='(کد D14)')`. \n"
+                "--- \n"
+                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST use the appropriate tool (`get_min_price_by_product_name` or `get_product_feature`). This rule takes priority over the product code rule if both are present. \n"
+                "FEW-SHOT EXAMPLE: \n"
+                "User Query: 'کمترین قیمت ... محصول X ... چقدر است؟' \n"
+                "Your action: Call `get_min_price_by_product_name(product_name='محصول X')`. \n"
+                "--- \n"
                 "Other Rules: \n"
-                "- If the user asks for a specific feature value (e.g., 'عرض ... چقدر است؟'), call get_product_feature with product_name and feature_name. \n"
-                "- If the user asks for minimum price (e.g., 'کمترین قیمت ... چقدر است؟'), call get_min_price_by_product_name. \n"
                 "- Otherwise use vector_search for discovery or ranking. \n"
                 "- If the request is ambiguous, respond with one short clarifying question. \n"
                 f"- You have at most 5 assistant messages per chat. Remaining assistant turns: {remaining_turns}. If you have no turns left, produce your best final answer using an appropriate tool."
@@ -359,11 +370,18 @@ async def chat(request: ChatRequest):
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
                 return ChatResponse(message=result)
+            elif function_name == "get_min_price_by_product_name":
+                result = function_to_call(
+                    product_name=function_args.get("product_name")
+                )
+                chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                return ChatResponse(message=result)
             elif function_name == "text_to_sql":
                 result = function_to_call(query=function_args.get("query"))
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
-                return ChatResponse(message=result)
+        return ChatResponse(message=result)
 
         # No tool call: return assistant's content if present (clarifying question or direct answer)
         if getattr(response_message, "content", None):
@@ -379,5 +397,5 @@ async def chat(request: ChatRequest):
         return ChatResponse(base_random_keys=results)
     
     # Default fallback if no tool is called
-    results = vector_search(user_query.strip(), k=5)
-    return ChatResponse(base_random_keys=results)
+        results = vector_search(user_query.strip(), k=5)
+        return ChatResponse(base_random_keys=results)
