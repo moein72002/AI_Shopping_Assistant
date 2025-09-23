@@ -20,3 +20,5 @@ db_data/
 .index_checkpoints/
 
 *.zip
+
+*.log
