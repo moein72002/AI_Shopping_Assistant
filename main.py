@@ -381,7 +381,7 @@ async def chat(request: ChatRequest):
                 result = function_to_call(query=function_args.get("query"))
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
-        return ChatResponse(message=result)
+                return ChatResponse(message=result)
 
         # No tool call: return assistant's content if present (clarifying question or direct answer)
         if getattr(response_message, "content", None):
