@@ -160,23 +160,32 @@ async def maybe_download_kaggle_dataset():
     """If torob.db is missing and Kaggle creds are present at runtime, download the dataset."""
     try:
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "torob.db")
-        if os.path.exists(db_path):
+        force = os.environ.get("FORCE_KAGGLE_DOWNLOAD") == "1"
+        print(f"[startup] Kaggle download check: force={force}, db_exists={os.path.exists(db_path)}")
+        if os.path.exists(db_path) and not force:
+            print("[startup] Skipping Kaggle download (DB already exists and force is off)")
             return
         if os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"):
             script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "download_data_scripts", "download_data_from_kaggle.py")
             if os.path.exists(script_path):
                 # Run the downloader
+                print("[startup] Running Kaggle download script...")
                 subprocess.run([sys.executable, script_path], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
                 # Move produced DB into root if created in shopping_dataset/
                 produced = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shopping_dataset", "torob.db")
                 if os.path.exists(produced):
                     try:
                         os.replace(produced, db_path)
+                        print("[startup] Moved torob.db into app root")
                     except Exception:
                         pass
+            else:
+                print("[startup] Kaggle script not found; skipping")
+        else:
+            print("[startup] Kaggle env vars not present; skipping download")
     except Exception as _:
         # Non-fatal; app should still run
-        pass
+        print("[startup] Kaggle download failed (non-fatal)")
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):

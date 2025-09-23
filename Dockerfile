@@ -15,9 +15,8 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- MODIFIED SECTION ---
-# Copy the download script from its subfolder into the image's WORKDIR
-# Copy the Kaggle download script
-COPY download_data_scripts/download_data_from_kaggle.py ./
+# Include the Kaggle downloader directory so startup can locate it at runtime
+COPY download_data_scripts ./download_data_scripts
 
 
 # Copy the rest of the application files
