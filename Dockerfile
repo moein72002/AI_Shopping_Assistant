@@ -30,7 +30,6 @@ RUN mv ./shopping_dataset/torob.db ./torob.db
 # Copy the rest of the application files
 COPY main.py ./
 COPY tools ./tools
-COPY torob.db ./torob.db
 
 # Optional: uncomment if indexes are present in your workspace
 # COPY vector_index.faiss ./vector_index.faiss
