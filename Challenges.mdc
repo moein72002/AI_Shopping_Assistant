@@ -1,0 +1,20 @@
+# Challenges and Resolutions
+
+Keep this file updated with significant blockers and how we solved them.
+
+## 1) Windows test server startup failures (Winsock 10106)
+- Symptom: uvicorn failed under pytest/xprocess with `OSError: [WinError 10106]`.
+- Root cause: Subprocess env was overwritten (missing SystemRoot, etc.).
+- Fix: In tests, inherit parent env: `env = os.environ.copy()` and set `PYTHONPATH` only.
+
+## 2) Dependency churn (pydantic_core/typing_extensions/anyio/httpx/httpcore)
+- Symptom: Repeated `ModuleNotFoundError` chain.
+- Fix: Pinned/added required transitive deps in `requirements.txt` and aligned starlette version with FastAPI.
+
+## 3) Flaky LLM tool selection
+- Symptom: Incorrect tool choice for code-in-name and feature queries.
+- Fix: Strengthened system prompt and tool definitions; kept logic LLM-driven.
+
+## 4) Docker image bloat / slow build context
+- Symptom: Large context transfer.
+- Fix: Minimal `.dockerignore`; copy only needed files; slim base image; pinned deps.

@@ -5,9 +5,9 @@ globs:
 alwaysApply: true
 ---
 
-From now on, I will write my request in the my_reuquests.mdc. Check my requests and answer or do them. Then delete completed requests from my_reuquests.mdc
+From now on, I will write my request in the my_reuquests.mdc. Check my requests and answer or do them. Then delete completed requests from my_reuquests.mdc. Add this description to project rules about this mdc file.
 
-Write a Challenges.mdc and how we solved them. Make sure to update it in the future.
+Write a Challenges.mdc and how we solved them. Make sure to update it in the future based on every important challange.
 
 My server has only 1GB of RAM, is it enough to run all of our functionalities?
 

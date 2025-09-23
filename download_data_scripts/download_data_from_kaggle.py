@@ -16,6 +16,9 @@ else:
 # NEW: Explicitly check if the environment variables are now set
 kaggle_username = os.getenv('KAGGLE_USERNAME')
 kaggle_key = os.getenv('KAGGLE_KEY')
+TOROB_PROXY_URL = os.getenv('TOROB_PROXY_URL')
+
+print(f"TOROB_PROXY_URL: {TOROB_PROXY_URL}")
 
 if not kaggle_username or not kaggle_key:
     raise ValueError("Kaggle credentials not found in environment! "

@@ -43,3 +43,11 @@ This document outlines the purpose of each key markdown file in the repository. 
 -   **`report.mdc`**
     -   **Content**: A template for the final project report and a script for the 5-minute video presentation. It summarizes the architecture, features, and challenges.
     -   **When to use**: To structure the final presentation and report. It also contains example `pytest` tests.
+
+-   **`my_requests.mdc` (Mutable)**
+    -   **Content**: The user's prioritized request list. Each item is an actionable instruction for the agent.
+    -   **When to use**: Treat as the authoritative backlog for the coding session. After completing an item, remove it from `my_requests.mdc` (or mark done) and proceed to the next.
+
+
+Important Rules:
+- When using API key make sure that the cost of running is not over $0.10 in total.
