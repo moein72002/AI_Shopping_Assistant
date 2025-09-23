@@ -9,6 +9,10 @@
 !tools
 !tools/**
 
+# Include the folder and script needed for the data download
+!download_data_scripts/
+!download_data_scripts/**
+
 # Optional vector indexes (uncomment locally if present and needed)
 !vector_index.faiss
 !vector_index.faiss.json
