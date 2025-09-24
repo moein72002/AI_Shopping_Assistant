@@ -16,3 +16,7 @@ Delete vector_search from LLM agent available tools.
 Improve tools description so that the LLM can more intelligently select tools.
 
 Run tests in .\scripts\run_scenarios_sample.py in paralel to boost speed. Add number of worker arg inside the script.
+
+Scenario 4: In some requests the user wants a product, but they don't know the exact product. They want help to find the desired product with some constraints that they usually put in their request. The LLM agent should help the user find a product based on constraints by asking some clarifying questions. Maybe it would be good to search and gather some products that meet the initial constraints and then start to ask some clarifying questions based on features and price of those products. I think it would be good to create a find_product_that_needs_clarification tool. This tool
+
+Scenario 3:

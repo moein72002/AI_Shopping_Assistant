@@ -257,7 +257,7 @@ def _llm_expand_queries(user_query: str) -> List[str]:
             f"\n{user_query}\n"\
             "Return only JSON."
         )
-        model = os.environ.get("LLM_BM25_MODEL", "gpt-5-nano")
+        model = os.environ.get("LLM_BM25_MODEL", "gpt-5-mini")
         resp = client.chat.completions.create(
             model=model,
             response_format={"type": "json_object"},

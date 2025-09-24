@@ -38,7 +38,7 @@ def extract_product_name(query: str) -> Optional[str]:
 "- ALWAYS preserve alphanumeric codes and numbers exactly as they appear. Do not translate, spell out, or alter them.\n"
 "- If you find a Torob `base_random_key` (6 lower-case English letters, e.g., 'bmubxu') or a member key (UUID), your sole output should be the Torob `base_random_key`.\n"
 "- Remove all non-essential filler words (e.g., articles, prepositions, adjectives like 'best' or 'cheap') to keep the query concise (ideally 1-5 words).\n"
-"- The final output must be in a strict JSON format: {\"queries\": [\"product_name_here\"]}"
+"- The final output must be in a strict JSON format: {\"name\": [\"product_name_here\"]}"
 "Persian Prompt: \n"
 "شما یک متخصص در پالایش جستارهای جستجوی خرید برای یک سیستم بازیابی واژگانی BM25 هستید که بر روی نام‌های محصولات فارسی کار می‌کند."
 "وظیفه شما این است که دقیقاً یک نام محصول واحد و مختصر را از جستار کاربر استخراج کنید. این جستار می‌تواند به زبان فارسی یا انگلیسی باشد. نام محصول باید شامل حیاتی‌ترین مشخصات آن باشد."
@@ -50,7 +50,7 @@ def extract_product_name(query: str) -> Optional[str]:
 "- همیشه کدهای حروفی-عددی و اعداد را دقیقاً همانطور که هستند حفظ کنید. آن‌ها را ترجمه، به حروف یا تغییر ندهید.\n"
 "- اگر یک `base_random_key` ترب (۶ حرف کوچک انگلیسی، مانند 'bmubxu') یا یک member key (UUID) پیدا کردید، تنها خروجی شما باید همان `base_random_key` ترب باشد.\n"
 "- تمام کلمات پرکننده و غیرضروری (مانند حروف اضافه، صفاتی مانند 'بهترین' یا 'ارزان') را حذف کنید تا جستار مختصر باقی بماند (ایده‌آل بین ۱ تا ۵ کلمه).\n"
-"- خروجی نهایی باید در قالب JSON دقیق باشد: {\"queries\": [\"product_name_here\"]}"
+"- خروجی نهایی باید در قالب JSON دقیق باشد: {\"name\": [\"product_name_here\"]}"
 """
             # "English Prompt:\n"
             # "You extract exactly one product name from a user's request (not a comparison). "
@@ -87,7 +87,7 @@ def extract_product_name(query: str) -> Optional[str]:
         content = resp.choices[0].message.content
         name = content
         data = json.loads(content or "{}")
-        name = (data.get("queries") or [])[0] or ""
+        name = (data.get("name") or [])[0] or ""
         return name or None
     except Exception:
         return None

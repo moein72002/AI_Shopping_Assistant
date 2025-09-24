@@ -2,5 +2,5 @@
 
 This document records specific limitations or behaviors of the LLMs used in this project.
 
--   **`gpt-5-nano`**:
+-   **`gpt-5-mini`**:
     -   This model series does **not** support the `temperature` or `top_p` parameters. All calls to this model must omit these parameters to avoid errors.

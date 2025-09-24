@@ -289,6 +289,7 @@ async def chat(request: ChatRequest):
     from tools.comparison_extractor_tool import comparison_extract_products
     from tools.product_name_extractor_tool import extract_product_name
     from tools.product_id_lookup_tool import extract_product_id
+    from tools.compare_two_products_tool import compare_two_products
 
     # --- Forced single-product flow before router: extract id/name then bm25 ---
     try:
@@ -408,6 +409,22 @@ async def chat(request: ChatRequest):
         {
             "type": "function",
             "function": {
+                "name": "compare_two_products",
+                "description": "Given two base product ids (random_key) and the user's query, compare using DB features/prices and return the better product id and a short Persian reason.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_id_a": {"type": "string", "description": "First base product id (random_key)"},
+                        "product_id_b": {"type": "string", "description": "Second base product id (random_key)"},
+                        "user_query": {"type": "string", "description": "Original user query to guide comparison"}
+                    },
+                    "required": ["product_id_a", "product_id_b", "user_query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "get_product_feature",
                 "description": "Gets a specific feature of a named product. Use when the user asks for a specific attribute of a product.",
                 "parameters": {
@@ -478,7 +495,7 @@ async def chat(request: ChatRequest):
                 "User Query: 'کمترین قیمت ... محصول X ... چقدر است؟' \n"
                 "Your action: Find product id via `extract_product_id` or `bm25_search` (after name extraction), then call `get_min_price_by_product_id(product_id=...)`. \n"
                 "--- \n"
-                "3. **Comparison Rule**: If the user's request compares two products (e.g., 'A vs B', 'which is better, A or B', or a sentence clearly mentioning two product names/models), FIRST call `comparison_extract_products(query=...)` to get `product_a` and `product_b`. THEN call `bm25_search` separately for each extracted name and merge the results. \n"
+                "3. **Comparison Rule**: If the user's request compares two products (e.g., 'A vs B', 'which is better, A or B', or a sentence clearly mentioning two product names/models), FIRST call `comparison_extract_products(query=...)` to get `product_a` and `product_b`. THEN call `bm25_search` separately for each extracted name to get top candidate ids. FINALLY call `compare_two_products(product_id_a=..., product_id_b=..., user_query=...)` to select the winner and provide a short Persian reason. Return the winning id in base_random_keys. \n"
                 "--- \n"
                 "Other Rules: \n"
                 "- If the query resembles a product-finding request (mentions a product type, brand, or model), you MUST return product candidates now. Prefer `extract_product_name` followed by `bm25_search`. Do NOT ask clarifying questions in the first turn if you can produce candidates. \n"
@@ -489,7 +506,7 @@ async def chat(request: ChatRequest):
         }
         model_messages = [system_message] + (history[-10:])
         response = client.chat.completions.create(
-            model="gpt-5-nano",
+            model="gpt-5-mini",
             messages=model_messages,
             tools=tools,
             tool_choice="auto",
@@ -508,6 +525,7 @@ async def chat(request: ChatRequest):
                 "get_min_price_by_product_name": get_min_price_by_product_name,
                 "get_min_price_by_product_id": get_min_price_by_product_id,
                 "text_to_sql": text_to_sql,
+                "compare_two_products": compare_two_products,
             }
             tool_call = tool_calls[0]
             function_name = tool_call.function.name
@@ -524,17 +542,40 @@ async def chat(request: ChatRequest):
             elif function_name == "comparison_extract_products":
                 pair = function_to_call(query=function_args.get("query"))
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "pair": pair})
-                # If extracted, run bm25_llm_search for each name and merge
+                # If extracted, run bm25 for each name, select top candidate for each, then compare
+                ra_top: Optional[str] = None
+                rb_top: Optional[str] = None
                 merged: _List[str] = []
                 if pair.get("product_a"):
                     ra = bm25_search(pair["product_a"], k=5) or []
-                    merged.extend([rk for rk in ra if rk not in merged])
+                    if ra:
+                        ra_top = ra[0]
+                        merged.extend([rk for rk in ra if rk not in merged])
                 if pair.get("product_b"):
                     rb = bm25_search(pair["product_b"], k=5) or []
-                    merged.extend([rk for rk in rb if rk not in merged])
+                    if rb:
+                        rb_top = rb[0]
+                        merged.extend([rk for rk in rb if rk not in merged])
                 name_map = _base_names_for_keys(merged)
-                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "comparison_merge", "results": merged[:10], "names": name_map})
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "comparison_candidates", "a_top": ra_top, "b_top": rb_top, "all": merged[:10], "names": name_map})
+                # If we have both top candidates, run compare tool
+                if ra_top and rb_top:
+                    winner_id, reason_fa = compare_two_products(ra_top, rb_top, user_query)
+                    _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "compare_two_products", "winner": winner_id, "reason": reason_fa})
+                    if winner_id:
+                        return ChatResponse(message=reason_fa, base_random_keys=[winner_id])
+                # Fallback: return merged candidates
                 return ChatResponse(base_random_keys=merged[:10] or None)
+            elif function_name == "compare_two_products":
+                winner_id, reason = function_to_call(
+                    product_id_a=function_args.get("product_id_a"),
+                    product_id_b=function_args.get("product_id_b"),
+                    user_query=function_args.get("user_query") or user_query,
+                )
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "winner": winner_id, "reason": reason})
+                if winner_id:
+                    return ChatResponse(message=reason, base_random_keys=[winner_id])
+                return ChatResponse(base_random_keys=None)
             elif function_name == "extract_product_name":
                 name = function_to_call(query=function_args.get("query"))
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "name": name})

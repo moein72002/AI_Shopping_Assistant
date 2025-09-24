@@ -1,0 +1,106 @@
+[
+    {
+        "Timestamp": "2025-09-23T20:34:28.464509",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t377-40265ce1-9d6d-4a24-a6d6-0b850a479f64",
+        "Last Query": "لطفاً درباره ظرفیت ماگ سرامیکی دسته رنگی طرح نشانگر سوخت – Coffee Fuel Gauge – اطلاعات بیشتری بدهید و بفرمایید که این ماگ چه ظرفیتی دارد؟",
+        "Response": "Feature 'ظرفیت' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:34:17.541590",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t828-aa3c88ec-d9df-4ef3-8ae7-5c0ad291950f",
+        "Last Query": "ویژگی مبرد کولر گازی پاکشوما مدل MPF 18CH با ظرفیت ۱۸ هزار چیست؟",
+        "Response": "Product not found."
+    },
+    {
+        "Timestamp": "2025-09-23T20:34:05.014766",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t316-0ac3821c-9f24-4e2c-9876-22bc1797c792",
+        "Last Query": "میز جلو مبلی اسمردیس مدل J131 از چه موادی ساخته شده است؟",
+        "Response": "Feature 'مواد' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:31:57.018940",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t872-1258a6b9-1d33-4ee5-9b77-d0bceaece787",
+        "Last Query": "آیا لوستر اتاق کودک طرح love کد A3891 به طور خاص از چه جنسی ساخته شده است؟",
+        "Response": "Product not found."
+    },
+    {
+        "Timestamp": "2025-09-23T20:31:45.901370",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t340-cd6858ce-efb5-4855-9631-2f5ec6b7b653",
+        "Last Query": "سلام، می‌خواستم درباره وضعیت محصول \"برد یخچال فریزر دوو مدل R15\" اطلاعاتی بگیرم. آیا این محصول نو است یا خیر؟",
+        "Response": "Feature 'وضعیت' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:31:14.879295",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t472-3690e47b-0acb-4896-b4f9-76dc96e5fa55",
+        "Last Query": "این ست کابینت و روشویی دلفین مدل ZN-R13-W-6040 به همراه آینه و باکس دارای چند عضو است؟",
+        "Response": "Feature 'اعضا' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:29:16.319838",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t830-906cc7db-98ac-4031-aa88-4eeb4f472dc9",
+        "Last Query": "تراکم قالی فرش 1200 شانه برجسته نقشه برکه زمینه یاسی - 12 متری چقدر است؟",
+        "Response": "Product not found."
+    },
+    {
+        "Timestamp": "2025-09-23T20:26:46.895666",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t347-4ad4a04c-ccdc-4fb1-812c-7a5f7faab0ba",
+        "Last Query": "آیا می‌توانید بگویید جنس میز جلومبلی مدل تسلا از چه موادی ساخته شده است؟",
+        "Response": "Feature 'جنس' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:26:24.635948",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t313-44921e4f-7f2c-416c-9f95-a201d6351492",
+        "Last Query": "آیا محصول باکس 60لیتری سایز همه مدل سایز - نارنجی / ۱۰اینچ به صورت نو موجود است یا دست دوم؟",
+        "Response": "base=['uqeyuv', 'gzeyzb', 'egoxko']"
+    },
+    {
+        "Timestamp": "2025-09-23T20:26:11.788108",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t824-132b8c09-efc9-4ecd-892e-26e27369cb00",
+        "Last Query": "آیا میز بار DBP99 از چه جنسی ساخته شده است؟",
+        "Response": "-"
+    },
+    {
+        "Timestamp": "2025-09-23T20:23:46.059656",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t330-494ebb81-0959-4703-acda-9f6b27e52acc",
+        "Last Query": "آیا می‌توانید به من بگویید که وضعیت محصول \"رولت خوری دست ساز سرامیکی رودخانه\" از نظر نو یا دست دوم بودن چگونه است؟",
+        "Response": "Feature 'وضعیت' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:23:27.482599",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t844-32bb3fb9-7600-481b-95e9-2c88575ee143",
+        "Last Query": "آیا می‌توانید اطلاعاتی درباره جنس لوستر لاینر مولکولی هفت شعله | مناسب آشپزخانه مدل خطی | کد ML-73 | برند رومالوستر به من بدهید؟",
+        "Response": "Feature 'جنس' not found for this product."
+    },
+    {
+        "Timestamp": "2025-09-23T20:21:14.293827",
+        "Status": "200",
+        "Path": "/chat",
+        "Chat ID": "t866-e92c708c-f24d-4ad6-85aa-d70326d3a857",
+        "Last Query": "می‌خواستم بپرسم اندازه و متراژ فرش طلایی جدید الماس سیلور 1200 شانه چقدر است؟",
+        "Response": "Feature 'ابعاد' not found for this product."
+    }
+]
