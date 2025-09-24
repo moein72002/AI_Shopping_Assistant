@@ -235,19 +235,5 @@ This scenario is designed to ensure the judge is correctly connected to the serv
 
 ***
 
-### **Scenario Eight**
-**Goal:** The user provides a query that maps to a specific product on Torob and wants similar products.
-**Output:** We provide the user with a list of random keys for products similar to their query (in the `base_random_keys` section).
-* **Activation Date:** September 20th (if needed)
-* **Points:** 300
-
-***
-
-### **Scenario Nine**
-**Goal:** The user provides a query that maps to several products on Torob, and we must return a good ranking of products to the user.
-**Output:** We show the user the top ranking (in the `base_random_keys` section).
-* **Activation Date:** September 20th (if needed)
-* **Points:** 300
-
 Important Notes:
 The length of the text sent from your service must be a maximum of 10,000 characters.

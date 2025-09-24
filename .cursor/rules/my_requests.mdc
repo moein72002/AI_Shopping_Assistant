@@ -26,3 +26,5 @@ Consider english_names as well as persian names in product table.
 In scenario2 tests (available in .\server_tests\scenario2.json) user has a question about a specific product. After finding the product using product_name_extractor_tool and bm25_tool we should pass the product id to a new tool (answer_question_about_a_product) that first retrieves the product data (features, price, etc) from dataset. Then, pass the product data with the user request to the LLM agent and the LLM agent should answer the question about the product based on the user question and the product data.
 
 Scenario 5: ID of the product (6-digit lowercase) may be next to its name in the requests in scenario 5 requests. If both of the product IDs are in the request, these two IDs should be passed to the compare_two_products_tool directly. If only the ID of one product is available in the comparison request, the comparison_extractor_tool should return the ID of that product instead of its name, and the bm25_tool should always check its input to return the input itself if it is only a product id (6-digit lowercase).
+
+Maybe I can do the export name task using the router LLM agent.
