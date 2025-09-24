@@ -305,40 +305,10 @@ async def chat(request: ChatRequest):
     from tools.comparison_extractor_tool import comparison_extract_products
     from tools.product_name_extractor_tool import extract_product_name
     from tools.product_id_lookup_tool import extract_product_id
+    from tools.answer_question_about_a_product_tool import answer_question_about_a_product
     from tools.compare_two_products_tool import compare_two_products
 
-    # --- Forced single-product flow before router: extract id/name then bm25 ---
-    try:
-        text_q = (user_query or "").strip()
-        ql = text_q.lower()
-        # Heuristic comparison detection (avoid extractor when comparing two products)
-        comparison_markers = [" vs ", " مقابل ", "مقایسه", "کدام", " یا ", "/", "در برابر", "بهتر است"]
-        is_comparison = any(marker in ql for marker in comparison_markers)
-        if not is_comparison and len(text_q) > 0:
-            _append_chat_log(request.chat_id, {"stage": "force_precheck", "query": text_q})
-            # Fast path: inline id
-            pid = extract_product_id(query=text_q)
-            _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": "extract_product_id", "args": {"query": text_q}, "product_id": pid})
-            if pid:
-                name_map = _base_names_for_keys([pid])
-                print(f"[main] extract_product_id name_map={name_map} results={pid}")
-                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "extract_product_id", "results": [pid], "names": name_map})
-                return ChatResponse(base_random_keys=[pid])
-
-            # Extract a concise name, then run bm25_search on it
-            pname = extract_product_name(query=text_q)
-            _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": "extract_product_name", "args": {"query": text_q}, "name": pname})
-            if pname:
-                results = bm25_search(pname, k=5) or []
-                print(f"bm25_search results: {results}")
-                name_map = _base_names_for_keys(results)
-                print(f"bm25_search results {results}, name_map: {name_map}")
-                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": pname, "results": results[:10], "names": name_map})
-                if results:
-                    return ChatResponse(base_random_keys=results)
-    except Exception:
-        # Ignore and let router proceed
-        pass
+    # No precheck heuristics; rely on router tool-calling entirely
 
     # Maintain sliding window history (keep last 10 messages total)
     history = chat_histories.get(request.chat_id, [])
@@ -428,6 +398,21 @@ async def chat(request: ChatRequest):
         {
             "type": "function",
             "function": {
+                "name": "answer_question_about_a_product",
+                "description": "Answer a question about a specific product using its DB features and min price. Use when product id is known.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string", "description": "base_random_key of the product"},
+                        "question": {"type": "string", "description": "User question text"}
+                    },
+                    "required": ["product_id", "question"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "compare_two_products",
                 "description": "Given two base product ids (random_key) and the user's query, compare using DB features/prices and return the better product id and a short Persian reason.",
                 "parameters": {
@@ -509,7 +494,7 @@ async def chat(request: ChatRequest):
                 "--- \n"
                 "1. **Product Identifier Rule**: If the user's query includes a 6-letter product id (e.g., 'gadgjv'), FIRST call `extract_product_id(query=...)`. If an id is returned, use it directly (and for price, call `get_min_price_by_product_id`). If no id is present, you may call `extract_product_name(query=...)` to get a concise name and then use `bm25_search` with that name. \n"
                 "--- \n"
-                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST first identify the product (prefer id via `extract_product_id` or candidates via `bm25_search` on an extracted name). Only AFTER the product is found should you call `get_min_price_by_product_id` (preferred) or `get_product_feature`. \n"
+                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST first identify the product (prefer id via `extract_product_id` or candidates via `bm25_search` on an extracted name). AFTER the product is found: for minimum price use `get_min_price_by_product_id`; otherwise call `answer_question_about_a_product(product_id=..., question=...)`. \n"
                 "FEW-SHOT EXAMPLE: \n"
                 "User Query: 'کمترین قیمت ... محصول X ... چقدر است؟' \n"
                 "Your action: Find product id via `extract_product_id` or `bm25_search` (after name extraction), then call `get_min_price_by_product_id(product_id=...)`. \n"
@@ -544,6 +529,7 @@ async def chat(request: ChatRequest):
                 "get_min_price_by_product_name": get_min_price_by_product_name,
                 "get_min_price_by_product_id": get_min_price_by_product_id,
                 "text_to_sql": text_to_sql,
+                "answer_question_about_a_product": answer_question_about_a_product,
                 "compare_two_products": compare_two_products,
             }
             tool_call = tool_calls[0]
@@ -600,7 +586,7 @@ async def chat(request: ChatRequest):
             elif function_name == "extract_product_name":
                 name = function_to_call(query=function_args.get("query"))
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "name": name})
-                # If we got a name, run bm25 name search
+                # If we got a name, run bm25 name search and then let the agent decide next tool
                 print(f"[main] bm25_search name={name}")
                 if name:
                     results = bm25_search(name, k=5) or []
@@ -609,7 +595,7 @@ async def chat(request: ChatRequest):
                     print(f"[main] bm25_search name_map={name_map} results={results}")
                     _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": name, "results": results[:10], "names": name_map})
                     return ChatResponse(base_random_keys=results)
-                # fallback to bm25_llm_search on full query
+                # fallback to bm25 on full query
                 results = bm25_search(function_args.get("query"), k=5) or []
                 return ChatResponse(base_random_keys=results)
             elif function_name == "extract_product_id":
@@ -637,6 +623,15 @@ async def chat(request: ChatRequest):
             elif function_name == "get_min_price_by_product_id":
                 result = function_to_call(
                     product_id=function_args.get("product_id")
+                )
+                chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "message": result})
+                return ChatResponse(message=result)
+            elif function_name == "answer_question_about_a_product":
+                result = function_to_call(
+                    product_id=function_args.get("product_id"),
+                    question=function_args.get("question") or user_query,
                 )
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
