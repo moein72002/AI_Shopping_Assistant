@@ -15,4 +15,4 @@ Delete vector_search from LLM agent available tools.
 
 Improve tools description so that the LLM can more intelligently select tools.
 
-Why when I ran eval_bm25_llm.py for chat_id="t1489-97abda97-dbce-412a-8d09-6d45b01d478f" from .\server_tests\scenarios_1_to_5_requests.json tests it found the currect product, but when I used /chat with the exact same request the bm25_llm_search's result was empty as you can see in its request log file (.\logs\t1489-97abda97-dbce-412a-8d09-6d45b01d478f.log). Fix this problem with the bm25_llm_search tool. Run commands yourself to make sure everything works properly in the end. You may use .\scripts\play_chat.py script for testing (add this note in related mdc file).
+Run tests in .\scripts\run_scenarios_sample.py in paralel to boost speed. Add number of worker arg inside the script.

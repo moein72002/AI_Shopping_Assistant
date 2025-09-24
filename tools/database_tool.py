@@ -7,24 +7,7 @@ import json
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
-
-
-def get_product_by_code(product_code: str) -> Optional[str]:
-    """Finds a product by a code in its name, e.g., (کد D14)."""
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
-        # The code might be part of the name, so use LIKE
-        search_pattern = f"%{product_code}%"
-        cur.execute(
-            "SELECT random_key FROM base_products WHERE persian_name LIKE ?",
-            (search_pattern,),
-        )
-        result = cur.fetchone()
-        conn.close()
-        return result[0] if result else None
-    except Exception:
-        return None
+# get_product_by_code removed per new design
 
 # Mapping for common Persian feature names to English keys in the JSON
 FEATURE_NAME_MAP = {
@@ -128,6 +111,7 @@ def get_min_price_by_product_name(product_name: str) -> str | None:
         if not row:
             conn.close()
             return None
+
         base_rk = row[0]
         cur.execute(
             "SELECT MIN(price) FROM members WHERE base_random_key = ?",
@@ -137,6 +121,21 @@ def get_min_price_by_product_name(product_name: str) -> str | None:
         conn.close()
         if price_row and price_row[0] is not None:
             return str(price_row[0])
+        return None
+    except Exception:
+        return None
+
+
+def get_min_price_by_product_id(product_id: str) -> str | None:
+    """Return the minimum price across member offers for a given base product id (random_key)."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT MIN(price) FROM members WHERE base_random_key=?", (product_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0] is not None:
+            return str(row[0])
         return None
     except Exception:
         return None

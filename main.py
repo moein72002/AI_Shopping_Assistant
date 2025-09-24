@@ -254,18 +254,6 @@ async def maybe_download_kaggle_dataset():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    # Import tools here to ensure dependencies are loaded on-demand
-    from tools.database_tool import (
-        text_to_sql, 
-        get_product_by_code, 
-        get_product_feature,
-        get_min_price_by_product_name
-    )
-    from tools.vector_search_tool import vector_search
-    from tools.bm25_tool import bm25_search
-    from tools.bm25_llm_tool import bm25_llm_search
-    from openai import OpenAI
-
     chat_id = request.chat_id
     
     # Scenario 0: Content-based health checks (chat_id can be random)
@@ -290,6 +278,49 @@ async def chat(request: ChatRequest):
 
     user_query = request.messages[-1].content
     
+    # Import tools here to ensure dependencies are loaded only after sanity checks
+    from tools.database_tool import (
+        text_to_sql,
+        get_product_feature,
+        get_min_price_by_product_name,
+        get_min_price_by_product_id,
+    )
+    from tools.vector_search_tool import vector_search
+    from tools.bm25_tool import bm25_search
+    from tools.comparison_extractor_tool import comparison_extract_products
+    from tools.product_name_extractor_tool import extract_product_name
+    from tools.product_id_lookup_tool import extract_product_id
+
+    # --- Forced single-product flow before router: extract id/name then bm25 ---
+    try:
+        text_q = (user_query or "").strip()
+        ql = text_q.lower()
+        # Heuristic comparison detection (avoid extractor when comparing two products)
+        comparison_markers = [" vs ", " مقابل ", "مقایسه", "کدام", " یا ", "/", "در برابر", "بهتر است"]
+        is_comparison = any(marker in ql for marker in comparison_markers)
+        if not is_comparison and len(text_q) > 0:
+            _append_chat_log(request.chat_id, {"stage": "force_precheck", "query": text_q})
+            # Fast path: inline id
+            pid = extract_product_id(query=text_q)
+            _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": "extract_product_id", "args": {"query": text_q}, "product_id": pid})
+            if pid:
+                name_map = _base_names_for_keys([pid])
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "extract_product_id", "results": [pid], "names": name_map})
+                return ChatResponse(base_random_keys=[pid])
+
+            # Extract a concise name, then run bm25_search on it
+            pname = extract_product_name(query=text_q)
+            _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": "extract_product_name", "args": {"query": text_q}, "name": pname})
+            if pname:
+                results = bm25_search(pname, k=5) or []
+                name_map = _base_names_for_keys(results)
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": pname, "results": results[:10], "names": name_map})
+                if results:
+                    return ChatResponse(base_random_keys=results)
+    except Exception:
+        # Ignore and let router proceed
+        pass
+
     # Maintain sliding window history (keep last 10 messages total)
     history = chat_histories.get(request.chat_id, [])
     history.append({"role": "user", "content": user_query})
@@ -302,10 +333,9 @@ async def chat(request: ChatRequest):
     # --- Test-mode bypass: disable router LLM and run bm25_llm_search directly ---
     if os.environ.get("DISABLE_ROUTER_LLM") == "1":
         try:
-            from tools.bm25_llm_tool import bm25_llm_search as _bm25_llm_search
             k = 10
-            results = _bm25_llm_search(user_query.strip(), k=k)
-            _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "bm25_llm_search", "query": user_query, "results": results[:10] if results else []})
+            results = bm25_search(user_query.strip(), k=k)
+            _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "bm25_search", "query": user_query, "results": results[:10] if results else []})
             if not results:
                 # Fallback to semantic vector search to ensure we return candidates in tests
                 vec = vector_search(user_query.strip(), k=5)
@@ -316,6 +346,7 @@ async def chat(request: ChatRequest):
             pass
 
     # --- New Tool-Based Intent Router ---
+    from openai import OpenAI
     client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=20)
 
     tools = [
@@ -333,16 +364,16 @@ async def chat(request: ChatRequest):
                 },
             },
         },
+        # bm25_llm_search removed from router: use extract_product_name + bm25_search instead
         {
             "type": "function",
             "function": {
-                "name": "bm25_llm_search",
-                "description": "LLM-augmented BM25S search. The LLM extracts brand/model/codes and creates 1-3 concise sub-queries, then BM25S retrieves matching products. Prefer this when queries contain numbers, codes, English tokens, or more than one product.",
+                "name": "comparison_extract_products",
+                "description": "Extracts the two product names from comparison-style queries (e.g., 'A vs B'). Returns product_a and product_b for subsequent search calls.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Original user query (Persian/English). The tool will also include the raw query verbatim as a sub-query to prevent over-pruning by the LLM."},
-                        "k": {"type": "integer", "description": "Max results to return (<=10).", "default": 5}
+                        "query": {"type": "string", "description": "Original user query (Persian/English)."}
                     },
                     "required": ["query"],
                 },
@@ -351,14 +382,28 @@ async def chat(request: ChatRequest):
         {
             "type": "function",
             "function": {
-                "name": "get_product_by_code",
-                "description": "Returns the base_random_key by matching a product code present in the product name, e.g., '(کد D14)'.",
+                "name": "extract_product_name",
+                "description": "Extract a single product name (brand+model) from a non-comparison query; returns a concise lexical name to pass to bm25_llm_search.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "product_code": {"type": "string", "description": "The product code text, e.g., 'D14' or '(کد D14)'."}
+                        "query": {"type": "string"}
                     },
-                    "required": ["product_code"],
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "extract_product_id",
+                "description": "Extract a 6-letter product id (base_random_key) from the query and validate against DB.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"}
+                    },
+                    "required": ["query"],
                 },
             },
         },
@@ -381,13 +426,27 @@ async def chat(request: ChatRequest):
             "type": "function",
             "function": {
                 "name": "get_min_price_by_product_name",
-                "description": "Gets the absolute lowest price for a product from all sellers. Use this when the user asks for the 'minimum price', 'lowest price', or 'cheapest price'.",
+                "description": "(Legacy) Gets the lowest price by name; prefer get_min_price_by_product_id after the product is found.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "product_name": {"type": "string", "description": "The product name to match in the base catalog."}
                     },
                     "required": ["product_name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_min_price_by_product_id",
+                "description": "Gets the absolute lowest price for a product by base_random_key. Call only AFTER the product id is found via bm25_llm_search or extract_product_id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string", "description": "The 6-letter base_random_key."}
+                    },
+                    "required": ["product_id"],
                 },
             },
         },
@@ -414,13 +473,14 @@ async def chat(request: ChatRequest):
                 "You are a friendly AI Shopping Assistant. \n"
                 "Rule Priority: Your main goal is to answer the user's specific question. If a query contains both a product identifier (like a code) and a question about a feature (like price or width), you MUST prioritize answering the feature question. \n"
                 "--- \n"
-                "1. **Product Code Rule**: If the user's query ONLY asks to find a product and provides a code like '(کد D14)', call `get_product_by_code`. \n"
-                "Example: User says '... (کد D14) ...', you MUST call `get_product_by_code(product_code='(کد D14)')`. \n"
+                "1. **Product Identifier Rule**: If the user's query includes a 6-letter product id (e.g., 'gadgjv'), FIRST call `extract_product_id(query=...)`. If an id is returned, use it directly (and for price, call `get_min_price_by_product_id`). If no id is present, you may call `extract_product_name(query=...)` to get a concise name and then use `bm25_llm_search` with that name. \n"
                 "--- \n"
-                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST use the appropriate tool (`get_min_price_by_product_name` or `get_product_feature`). This rule takes priority over the product code rule if both are present. \n"
+                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST first identify the product (prefer id via `extract_product_id` or candidates via `bm25_llm_search`). Only AFTER the product is found should you call `get_min_price_by_product_id` (preferred) or `get_product_feature`. \n"
                 "FEW-SHOT EXAMPLE: \n"
                 "User Query: 'کمترین قیمت ... محصول X ... چقدر است؟' \n"
-                "Your action: Call `get_min_price_by_product_name(product_name='محصول X')`. \n"
+                "Your action: Find product id via `extract_product_id` or `bm25_llm_search`, then call `get_min_price_by_product_id(product_id=...)`. \n"
+                "--- \n"
+                "3. **Comparison Rule**: If the user's request compares two products (e.g., 'A vs B', 'which is better, A or B', or a sentence clearly mentioning two product names/models), FIRST call `comparison_extract_products(query=...)` to get `product_a` and `product_b`. THEN call `bm25_llm_search` separately for each extracted name and merge the results. \n"
                 "--- \n"
                 "Other Rules: \n"
                 "- If the query resembles a product-finding request (mentions a product type, brand, or model), you MUST return product candidates now. Always prefer `bm25_llm_search` over `vector_search` for finding products. Do NOT ask clarifying questions in the first turn if you can produce candidates. \n"
@@ -443,12 +503,13 @@ async def chat(request: ChatRequest):
 
         if tool_calls:
             available_functions = {
-                "vector_search": vector_search,
                 "bm25_search": bm25_search,
-                "bm25_llm_search": bm25_llm_search,
-                "get_product_by_code": get_product_by_code,
+                "comparison_extract_products": comparison_extract_products,
+                "extract_product_name": extract_product_name,
+                "extract_product_id": extract_product_id,
                 "get_product_feature": get_product_feature,
                 "get_min_price_by_product_name": get_min_price_by_product_name,
+                "get_min_price_by_product_id": get_min_price_by_product_id,
                 "text_to_sql": text_to_sql,
             }
             tool_call = tool_calls[0]
@@ -462,20 +523,37 @@ async def chat(request: ChatRequest):
                 name_map = _base_names_for_keys(results or [])
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": results[:10] if results else [], "names": name_map})
                 return ChatResponse(base_random_keys=results)
-            elif function_name == "bm25_llm_search":
-                k = function_args.get("k", 5)
-                if not isinstance(k, int) or k <= 0:
-                    k = 5
-                k = min(k, 10)
-                results = function_to_call(query=function_args.get("query"), k=k)
-                name_map = _base_names_for_keys(results or [])
-                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": results[:10] if results else [], "names": name_map})
+            # bm25_llm_search branch removed
+            elif function_name == "comparison_extract_products":
+                pair = function_to_call(query=function_args.get("query"))
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "pair": pair})
+                # If extracted, run bm25_llm_search for each name and merge
+                merged: _List[str] = []
+                if pair.get("product_a"):
+                    ra = bm25_search(pair["product_a"], k=5) or []
+                    merged.extend([rk for rk in ra if rk not in merged])
+                if pair.get("product_b"):
+                    rb = bm25_search(pair["product_b"], k=5) or []
+                    merged.extend([rk for rk in rb if rk not in merged])
+                name_map = _base_names_for_keys(merged)
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "comparison_merge", "results": merged[:10], "names": name_map})
+                return ChatResponse(base_random_keys=merged[:10] or None)
+            elif function_name == "extract_product_name":
+                name = function_to_call(query=function_args.get("query"))
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "name": name})
+                # If we got a name, run bm25 name search
+                if name:
+                    results = bm25_search(name, k=5) or []
+                    name_map = _base_names_for_keys(results)
+                    _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": name, "results": results[:10], "names": name_map})
+                    return ChatResponse(base_random_keys=results)
+                # fallback to bm25_llm_search on full query
+                results = bm25_search(function_args.get("query"), k=5) or []
                 return ChatResponse(base_random_keys=results)
-            elif function_name == "get_product_by_code":
-                result = function_to_call(product_code=function_args.get("product_code"))
-                name_map = _base_names_for_keys([result] if result else [])
-                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": [result] if result else [], "names": name_map})
-                return ChatResponse(base_random_keys=[result] if result else [])
+            elif function_name == "extract_product_id":
+                pid = function_to_call(query=function_args.get("query"))
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "product_id": pid})
+                return ChatResponse(base_random_keys=[pid] if pid else None)
             elif function_name == "get_product_feature":
                 result = function_to_call(
                     product_name=function_args.get("product_name"),
@@ -489,6 +567,14 @@ async def chat(request: ChatRequest):
             elif function_name == "get_min_price_by_product_name":
                 result = function_to_call(
                     product_name=function_args.get("product_name")
+                )
+                chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "message": result})
+                return ChatResponse(message=result)
+            elif function_name == "get_min_price_by_product_id":
+                result = function_to_call(
+                    product_id=function_args.get("product_id")
                 )
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
