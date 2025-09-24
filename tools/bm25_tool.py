@@ -1,117 +1,105 @@
+import argparse
 import os
-import re
 import sqlite3
-from typing import List
+from typing import List, Tuple
 
-_bm25_cache = {
-    "ready": False,
-    "doc_ids": None,
-    "bm25": None,
-}
+import numpy as np
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+import bm25s
 
 
-def _simple_tokenize(text: str) -> List[str]:
-    text = text.lower()
-    text = re.sub(r"[^\w\s]+", " ", text, flags=re.UNICODE)
-    return [t for t in text.split() if t]
+def _compose_text(persian: str | None, english: str | None) -> str:
+    parts = []
+    if english and english.strip():
+        parts.append(str(english))
+    if persian and persian.strip():
+        parts.append(str(persian))
+    return " ".join(parts).strip()
 
 
-def _load_bm25_assets(limit: int | None = None):
-    if _bm25_cache["ready"]:
-        return
-    import bm25s
+def load_products(db_path: str, limit: int | None = None) -> Tuple[np.ndarray, List[str]]:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.cursor()
+        sql = "SELECT random_key, persian_name, english_name FROM base_products"
+        if isinstance(limit, int) and limit > 0:
+            sql += f" LIMIT {int(limit)}"
+        cur.execute(sql)
+        ids: List[str] = []
+        texts: List[str] = []
+        for row in cur.fetchall():
+            pid = row["random_key"]
+            text = _compose_text(row["persian_name"], row["english_name"]) or ""
+            ids.append(str(pid))
+            texts.append(text)
+        return np.asarray(ids, dtype=str), texts
+    finally:
+        conn.close()
 
-    # Allow limiting docs via env for quicker cold-start/eval
-    if limit is None:
+
+class BM25ProductSearcher:
+    def __init__(self, ids: np.ndarray, texts: List[str]) -> None:
+        self.ids = np.asarray(ids)
+        self.texts = texts
+        # Tokenize and index
+        corpus_tokens = bm25s.tokenize(self.texts, stopwords=False)
+        self.retriever = bm25s.BM25()
+        self.retriever.index(corpus_tokens)
+
+    def top_k_ids(self, query: str, k: int = 5) -> List[int]:
+        # Tokenize query (compatible with bm25s.retrieve)
+        query_tokens = bm25s.tokenize(query, stopwords=False)
+        docs, scores = self.retriever.retrieve(
+            query_tokens, corpus=self.ids, k=k, sorted=True
+        )
+        # docs shape: (num_queries, k) -> here num_queries = 1
+        return [str(x) for x in docs[0].tolist()]
+
+
+# --- Simple module-level API ---
+_GLOBAL_SEARCHER: BM25ProductSearcher | None = None
+
+
+def _ensure_searcher() -> BM25ProductSearcher:
+    global _GLOBAL_SEARCHER
+    if _GLOBAL_SEARCHER is None:
+        # Optional environment override to limit rows during initialization for faster startup
+        limit_env = os.environ.get("BM25_LIMIT")
         try:
-            env_limit = os.getenv("BM25_LIMIT_DOCS")
-            if env_limit:
-                limit = int(env_limit)
-        except Exception:
-            pass
+            limit_val = int(limit_env) if limit_env is not None else None
+        except ValueError:
+            limit_val = None
 
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    q = (
-        "SELECT random_key, "
-        "COALESCE(persian_name,'') || ' ' || COALESCE(english_name,'') || ' ' || COALESCE(extra_features,'') "
-        "FROM base_products"
-    )
-    if limit and limit > 0:
-        q += " LIMIT ?"
-        cur.execute(q, (limit,))
-    else:
-        cur.execute(q)
-    rows = cur.fetchall()
-    conn.close()
-
-    doc_ids = [r[0] for r in rows]
-    # Include the random_key in the text to catch code/id queries directly
-    corpus = [f"{rk} {txt}" for rk, txt in rows]
-    # Use a Unicode-friendly tokenizer for Persian/Arabic text
-    corpus_tokens = [_simple_tokenize(text) for text in corpus]
-    retriever = bm25s.BM25(corpus=corpus)
-    retriever.index(corpus_tokens)
-
-    _bm25_cache.update({
-        "ready": True,
-        "doc_ids": doc_ids,
-        "bm25": retriever,
-    })
-    if os.getenv("BM25_DEBUG"):
-        try:
-            print(f"[bm25] indexed_docs={len(doc_ids)} limit={limit}")
-            print(f"[bm25] sample_doc_id={doc_ids[0] if doc_ids else 'NA'}")
-        except Exception:
-            pass
+        ids, texts = load_products("torob.db", limit=limit_val)
+        if len(ids) == 0:
+            raise RuntimeError("No products loaded from database.")
+        _GLOBAL_SEARCHER = BM25ProductSearcher(ids, texts)
+    return _GLOBAL_SEARCHER
 
 
 def bm25_search(query: str, k: int = 5) -> List[str]:
-    try:
-        if not _bm25_cache["ready"]:
-            # Build once, lazily
-            _load_bm25_assets()
-
-        # Tokenize query with the same Unicode-friendly tokenizer
-        query_tokens = [_simple_tokenize(query)]  # bm25s expects List[List[str]]
-        if os.getenv("BM25_DEBUG"):
-            qt = query_tokens[0] if query_tokens else []
-            print(f"[bm25] q_tokens={len(qt)} example={(qt[:5]) if qt else []}")
-        docs, scores = _bm25_cache["bm25"].retrieve(query_tokens, k=k)
-
-        # docs may be indices or strings depending on version/config
-        first = None
-        try:
-            first = docs[0][0]
-        except Exception:
-            pass
-
-        if isinstance(first, int):
-            idxs = list(docs[0])
-            out = [_bm25_cache["doc_ids"][i] for i in idxs if 0 <= i < len(_bm25_cache["doc_ids"])]
-            if os.getenv("BM25_DEBUG"):
-                print(f"[bm25] hits={len(out)} ids={out[:5]}")
-            return out
-        else:
-            # Assume strings
-            id_map = {text: _bm25_cache["doc_ids"][i] for i, text in enumerate(_bm25_cache["bm25"].corpus)}
-            out = []
-            for d in docs[0]:
-                rk = id_map.get(d)
-                if rk:
-                    out.append(rk)
-            if os.getenv("BM25_DEBUG"):
-                print(f"[bm25] hits={len(out)} ids={out[:5]}")
-            return out
-    except Exception as e:
-        if os.getenv("BM25_DEBUG"):
-            try:
-                print(f"[bm25] exception: {e}")
-            except Exception:
-                pass
-        return []
+    """Return the `random_key` values of the top 5 products for the given query."""
+    searcher = _ensure_searcher()
+    return searcher.top_k_ids(query, k=k)
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="BM25S search over base_products names")
+    parser.add_argument("--db", default="torob.db", help="Path to SQLite database file")
+    parser.add_argument("--query", required=True, help="Search query (Persian or English)")
+    parser.add_argument("--k", type=int, default=5, help="Top-K products to return (default: 5)")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of rows to index (for quick tests)")
+    args = parser.parse_args()
+
+    ids, texts = load_products(args.db, limit=args.limit)
+    if len(ids) == 0:
+        raise SystemExit("No products loaded from database.")
+
+    searcher = BM25ProductSearcher(ids, texts)
+    top_ids = searcher.top_k_ids(args.query, k=args.k)
+    print({"query": args.query, "top_ids": top_ids})
+
+
+if __name__ == "__main__":
+    main()

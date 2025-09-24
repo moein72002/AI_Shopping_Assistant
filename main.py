@@ -285,7 +285,6 @@ async def chat(request: ChatRequest):
         get_min_price_by_product_name,
         get_min_price_by_product_id,
     )
-    from tools.vector_search_tool import vector_search
     from tools.bm25_tool import bm25_search
     from tools.comparison_extractor_tool import comparison_extract_products
     from tools.product_name_extractor_tool import extract_product_name
@@ -337,10 +336,9 @@ async def chat(request: ChatRequest):
             results = bm25_search(user_query.strip(), k=k)
             _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "bm25_search", "query": user_query, "results": results[:10] if results else []})
             if not results:
-                # Fallback to semantic vector search to ensure we return candidates in tests
-                vec = vector_search(user_query.strip(), k=5)
-                _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "vector_search", "query": user_query, "results": vec[:10] if vec else []})
-                return ChatResponse(base_random_keys=vec or None)
+                # Ensure k results via bm25 padding path
+                results = bm25_search(user_query.strip(), k=5)
+                return ChatResponse(base_random_keys=results or None)
             return ChatResponse(base_random_keys=results)
         except Exception:
             pass
@@ -473,19 +471,18 @@ async def chat(request: ChatRequest):
                 "You are a friendly AI Shopping Assistant. \n"
                 "Rule Priority: Your main goal is to answer the user's specific question. If a query contains both a product identifier (like a code) and a question about a feature (like price or width), you MUST prioritize answering the feature question. \n"
                 "--- \n"
-                "1. **Product Identifier Rule**: If the user's query includes a 6-letter product id (e.g., 'gadgjv'), FIRST call `extract_product_id(query=...)`. If an id is returned, use it directly (and for price, call `get_min_price_by_product_id`). If no id is present, you may call `extract_product_name(query=...)` to get a concise name and then use `bm25_llm_search` with that name. \n"
+                "1. **Product Identifier Rule**: If the user's query includes a 6-letter product id (e.g., 'gadgjv'), FIRST call `extract_product_id(query=...)`. If an id is returned, use it directly (and for price, call `get_min_price_by_product_id`). If no id is present, you may call `extract_product_name(query=...)` to get a concise name and then use `bm25_search` with that name. \n"
                 "--- \n"
-                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST first identify the product (prefer id via `extract_product_id` or candidates via `bm25_llm_search`). Only AFTER the product is found should you call `get_min_price_by_product_id` (preferred) or `get_product_feature`. \n"
+                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST first identify the product (prefer id via `extract_product_id` or candidates via `bm25_search` on an extracted name). Only AFTER the product is found should you call `get_min_price_by_product_id` (preferred) or `get_product_feature`. \n"
                 "FEW-SHOT EXAMPLE: \n"
                 "User Query: 'کمترین قیمت ... محصول X ... چقدر است؟' \n"
-                "Your action: Find product id via `extract_product_id` or `bm25_llm_search`, then call `get_min_price_by_product_id(product_id=...)`. \n"
+                "Your action: Find product id via `extract_product_id` or `bm25_search` (after name extraction), then call `get_min_price_by_product_id(product_id=...)`. \n"
                 "--- \n"
-                "3. **Comparison Rule**: If the user's request compares two products (e.g., 'A vs B', 'which is better, A or B', or a sentence clearly mentioning two product names/models), FIRST call `comparison_extract_products(query=...)` to get `product_a` and `product_b`. THEN call `bm25_llm_search` separately for each extracted name and merge the results. \n"
+                "3. **Comparison Rule**: If the user's request compares two products (e.g., 'A vs B', 'which is better, A or B', or a sentence clearly mentioning two product names/models), FIRST call `comparison_extract_products(query=...)` to get `product_a` and `product_b`. THEN call `bm25_search` separately for each extracted name and merge the results. \n"
                 "--- \n"
                 "Other Rules: \n"
-                "- If the query resembles a product-finding request (mentions a product type, brand, or model), you MUST return product candidates now. Always prefer `bm25_llm_search` over `vector_search` for finding products. Do NOT ask clarifying questions in the first turn if you can produce candidates. \n"
-                "- Otherwise use vector_search for discovery or ranking. \n"
-                "- Prefer bm25_llm_search when the query contains explicit numbers/codes (e.g., model codes, sizes) or mentions multiple specific products to compare; this tool will extract concise lexical sub-queries and retrieve matching products via BM25S. \n"
+                "- If the query resembles a product-finding request (mentions a product type, brand, or model), you MUST return product candidates now. Prefer `extract_product_name` followed by `bm25_search`. Do NOT ask clarifying questions in the first turn if you can produce candidates. \n"
+                "- If the request is ambiguous (no clear product), ask one short clarifying question. \n"
                 "- If the request is ambiguous, respond with one short clarifying question. \n"
                 f"- You have at most 5 assistant messages per chat. Remaining assistant turns: {remaining_turns}. If you have no turns left, produce your best final answer using an appropriate tool."
             ),
@@ -542,8 +539,10 @@ async def chat(request: ChatRequest):
                 name = function_to_call(query=function_args.get("query"))
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "name": name})
                 # If we got a name, run bm25 name search
+                print(f"[main] bm25_search name={name}")
                 if name:
                     results = bm25_search(name, k=5) or []
+                    print(f"[main] bm25_search name={name} results={results}")
                     name_map = _base_names_for_keys(results)
                     _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": name, "results": results[:10], "names": name_map})
                     return ChatResponse(base_random_keys=results)
@@ -596,13 +595,13 @@ async def chat(request: ChatRequest):
             return ChatResponse(message=content_text)
 
     except Exception as e:
-        # Fallback to vector search on any failure
-        print(f"Tool-based router failed: {e}. Defaulting to vector search.")
+        # Fallback to bm25_search on any failure
+        print(f"Tool-based router failed: {e}. Defaulting to bm25_search.")
         _append_chat_log(request.chat_id, {"stage": "router_error", "error": str(e)})
-        results = vector_search(user_query.strip(), k=5)
-        _append_chat_log(request.chat_id, {"stage": "fallback_vector", "results": results[:10] if results else []})
+        results = bm25_search(user_query.strip(), k=5)
+        _append_chat_log(request.chat_id, {"stage": "fallback_bm25", "results": results[:10] if results else []})
         return ChatResponse(base_random_keys=results)
     
     # Default fallback if no tool is called
-        results = vector_search(user_query.strip(), k=5)
+        results = bm25_search(user_query.strip(), k=5)
         return ChatResponse(base_random_keys=results)

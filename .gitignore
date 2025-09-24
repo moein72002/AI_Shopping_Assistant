@@ -7,8 +7,6 @@ __pycache__/
 # Ignore environment file
 .env
 
-# Ignore data loading scripts
-scripts/
 
 
 db_data/
