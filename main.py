@@ -202,6 +202,8 @@ async def chat(request: ChatRequest):
         get_min_price_by_product_name
     )
     from tools.vector_search_tool import vector_search
+    from tools.bm25_tool import bm25_search
+    from tools.bm25_llm_tool import bm25_llm_search
     from openai import OpenAI
 
     chat_id = request.chat_id
@@ -247,6 +249,35 @@ async def chat(request: ChatRequest):
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "The user's search query, e.g., 'a red shirt for summer'"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "bm25_search",
+                "description": "Lexical search over product names/features. Use when query includes exact names, codes, ids.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Exactish name/code/id text to match lexically."}
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "bm25_llm_search",
+                "description": "LLM-augmented BM25S search. The LLM extracts brand/model/codes and creates 1-3 concise sub-queries, then BM25S retrieves matching products. Prefer this when queries contain numbers, codes, or more than one product.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Original user query (Persian/English)."},
+                        "k": {"type": "integer", "description": "Max results to return (<=10).", "default": 5}
                     },
                     "required": ["query"],
                 },
@@ -328,6 +359,7 @@ async def chat(request: ChatRequest):
                 "--- \n"
                 "Other Rules: \n"
                 "- Otherwise use vector_search for discovery or ranking. \n"
+                "- Prefer bm25_llm_search when the query contains explicit numbers/codes (e.g., model codes, sizes) or mentions multiple specific products to compare; this tool will extract concise lexical sub-queries and retrieve matching products via BM25S. \n"
                 "- If the request is ambiguous, respond with one short clarifying question. \n"
                 f"- You have at most 5 assistant messages per chat. Remaining assistant turns: {remaining_turns}. If you have no turns left, produce your best final answer using an appropriate tool."
             ),
@@ -345,6 +377,8 @@ async def chat(request: ChatRequest):
         if tool_calls:
             available_functions = {
                 "vector_search": vector_search,
+                "bm25_search": bm25_search,
+                "bm25_llm_search": bm25_llm_search,
                 "get_product_by_code": get_product_by_code,
                 "get_product_feature": get_product_feature,
                 "get_min_price_by_product_name": get_min_price_by_product_name,
@@ -357,6 +391,16 @@ async def chat(request: ChatRequest):
 
             if function_name == "vector_search":
                 results = function_to_call(query=function_args.get("query"))
+                return ChatResponse(base_random_keys=results)
+            elif function_name == "bm25_search":
+                results = function_to_call(query=function_args.get("query"))
+                return ChatResponse(base_random_keys=results)
+            elif function_name == "bm25_llm_search":
+                k = function_args.get("k", 5)
+                if not isinstance(k, int) or k <= 0:
+                    k = 5
+                k = min(k, 10)
+                results = function_to_call(query=function_args.get("query"), k=k)
                 return ChatResponse(base_random_keys=results)
             elif function_name == "get_product_by_code":
                 result = function_to_call(product_code=function_args.get("product_code"))
