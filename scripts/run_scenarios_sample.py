@@ -32,7 +32,7 @@ def post_chat(base_url: str, payload: Dict[str, Any], timeout: int = 30) -> Dict
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run 5 random /chat requests from the scenarios file")
     parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8080"), help="Service base URL (default: http://localhost:8000)")
-    parser.add_argument("--file", default=os.path.join("server_tests", "scenario1.json"), help="Path to scenarios JSON file")
+    parser.add_argument("--file", default=os.path.join("server_tests", "scenario5.json"), help="Path to scenarios JSON file")
     parser.add_argument("--limit", type=int, default=20, help="Number of random samples to run (default: 5)")
     # parser.add_argument("--seed", type=int, default=0, help="Random seed (default: 0)")
     parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds (default: 30)")
@@ -44,10 +44,10 @@ def main() -> int:
         return 1
 
     # random.seed(args.seed)
-    sample = random.sample(items, k=min(args.limit, len(items)))
+    # sample = random.sample(items, k=min(args.limit, len(items)))
 
     print(f"Base URL: {args.base_url}")
-    for i, it in enumerate(sample, 1):
+    for i, it in enumerate(items, 1):
         payload = item_to_payload(it)
         last = (payload.get("messages") or [{}])[-1].get("content", "")
         print(f"\n[{i}] Chat ID: {payload['chat_id']}")

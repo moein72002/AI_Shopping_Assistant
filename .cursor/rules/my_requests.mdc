@@ -20,3 +20,7 @@ Run tests in .\scripts\run_scenarios_sample.py in paralel to boost speed. Add nu
 Scenario 4: In some requests the user wants a product, but they don't know the exact product. They want help to find the desired product with some constraints that they usually put in their request. The LLM agent should help the user find a product based on constraints by asking some clarifying questions. Maybe it would be good to search and gather some products that meet the initial constraints and then start to ask some clarifying questions based on features and price of those products. I think it would be good to create a find_product_that_needs_clarification tool. This tool
 
 Scenario 3:
+
+Consider english_names as well as persian names in product table.
+
+In scenario2 tests (available in .\server_tests\scenario2.json) user has a question about a specific product. After finding the product using product_name_extractor_tool and bm25_tool we should pass the product id to a new tool that first retrieves the product data (features, price, etc) from dataset. Then, pass the product data with the user request to the LLM agent and the LLM agent should answer the question about the product based on the user question and the product data.

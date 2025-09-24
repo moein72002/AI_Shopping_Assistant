@@ -1,13 +1,5 @@
 [
     {
-        "Timestamp": "2025-09-23T20:37:34.583379",
-        "Status": "200",
-        "Path": "/chat",
-        "Chat ID": "t1045-99a6a2c9-7b5c-4634-8340-53d9680bde41",
-        "Last Query": "این دو تلویزیون ال جی NANO75 سایز ۵۰ اینچ Ultra HD 4K LED و تلویزیون ال جی مدل UT80006 سایز ۵۰ اینچ Ultra HD 4K LED با شناسه \"dmsmlc\" از لحاظ اصالت محصول چگونه با یکدیگر مقایسه می‌شوند؟ کدام یک اصالت بیشتری دارد؟",
-        "Response": "Feature 'اصالت' not found for this product."
-    },
-    {
         "Timestamp": "2025-09-23T20:34:42.726493",
         "Status": "200",
         "Path": "/chat",

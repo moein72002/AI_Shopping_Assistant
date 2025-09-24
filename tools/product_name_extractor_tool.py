@@ -76,7 +76,7 @@ def extract_product_name(query: str) -> Optional[str]:
         user_msg = f"User query:\n{query}\nReturn only JSON."
 
         resp = client.chat.completions.create(
-            model=os.environ.get("LLM_BM25_MODEL", "gpt-5"),
+            model=os.environ.get("LLM_BM25_MODEL", "gpt-5-mini"),
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": sys_prompt},

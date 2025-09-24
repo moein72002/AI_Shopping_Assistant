@@ -26,7 +26,7 @@ def comparison_extract_products(query: str) -> Dict[str, str]:
             "- KEEP ALPHANUMERIC CODES AND NUMBERS VERBATIM (e.g., NANO75, A3891, 50RU766S, M 051).\n"
             "- Keep 1-5 words per product; remove filler words.\n"
             "- If you cannot find two products, return an empty JSON object {}.\n"
-            "- Strict JSON only, no prose. Example: {\"product_a\": \"LG NANO75 50 inch\", \"product_b\": \"LG UT80006 50 inch\"}.\n"
+            "- Strict JSON only, no prose. Example: {\"product_a\": \"product_a_name\", \"product_b\": \"product_b_name\"}.\n"
             "\n"
             "Persian Prompt: \n"
             "از یک درخواست مقایسه، دقیقاً دو نام محصول استخراج کن. \n"
@@ -36,7 +36,7 @@ def comparison_extract_products(query: str) -> Dict[str, str]:
             "- کدها و اعداد را دقیق حفظ کن (مانند NANO75، A3891، 50RU766S، M 051).\n"
             "- برای هر محصول ۱ تا ۵ کلمه؛ کلمات اضافه حذف شوند.\n"
             "- اگر دو محصول پیدا نشد، یک JSON خالی {} برگردان.\n"
-            "- فقط JSON دقیق؛ بدون متن اضافی. مثال: {\"product_a\": \"ال جی NANO75 50 اینچ\", \"product_b\": \"ال جی UT80006 50 اینچ\"}.\n"
+            "- فقط JSON دقیق؛ بدون متن اضافی. مثال: {\"product_a\": \"product_a_name\", \"product_b\": \"product_b_name\"}.\n"
         )
 
         user_msg = (
@@ -44,9 +44,10 @@ def comparison_extract_products(query: str) -> Dict[str, str]:
             f"\n{query}\n"\
             "Return only JSON."
         )
+        print(f"[comparison_extract_products] user_msg: {user_msg}")
 
         resp = client.chat.completions.create(
-            model=os.environ.get("LLM_BM25_MODEL", "gpt-5"),
+            model=os.environ.get("LLM_BM25_MODEL", "gpt-5-mini"),
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": sys_prompt},

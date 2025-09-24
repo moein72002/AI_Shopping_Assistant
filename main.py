@@ -71,30 +71,46 @@ def _reset_chat_log(chat_id: str):
 
 
 def _base_names_for_keys(keys: _List[str]) -> Dict[str, str]:
-    """Use scripts/show_product.py to resolve names so behavior matches the script's view of the DB."""
-    out: Dict[str, str] = {}
+    """Return a mapping from `random_key` to product name.
+
+    Preference: use `persian_name` if non-empty, else `english_name`.
+    """
     if not keys:
-        return out
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    script = os.path.join(base_dir, "scripts", "show_product.py")
-    py = sys.executable
-    for rk in keys:
-        try:
-            proc = _subp.run(
-                [py, script, rk, "--name-only-json"],
-                cwd=base_dir,
-                stdout=_subp.PIPE,
-                stderr=_subp.PIPE,
-                text=True,
-                timeout=5,
+        return {}
+
+    db_path = os.path.join(os.path.dirname(__file__), "torob.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.cursor()
+        # First fetch all unique ids -> name into a lookup
+        lookup: Dict[str, str] = {}
+
+        unique_keys = list(dict.fromkeys(keys))
+        chunk_size = 900
+        for i in range(0, len(unique_keys), chunk_size):
+            chunk = unique_keys[i : i + chunk_size]
+            placeholders = ",".join(["?"] * len(chunk))
+            sql = (
+                "SELECT random_key, persian_name, english_name "
+                "FROM base_products WHERE random_key IN (" + placeholders + ")"
             )
-            if proc.returncode == 0:
-                data = json.loads(proc.stdout.strip() or "{}")
-                name = data.get("name") or ""
-                out[rk] = name
-        except Exception:
-            out[rk] = ""
-    return out
+            cur.execute(sql, chunk)
+            for row in cur.fetchall():
+                rid = str(row["random_key"])  # ensure str keys
+                pn = (row["persian_name"] or "").strip()
+                en = (row["english_name"] or "").strip()
+                name = pn if pn else en
+                lookup[rid] = name
+
+        # Now build an ordered mapping following the original input order
+        ordered: Dict[str, str] = {}
+        for k in keys:
+            ordered[str(k)] = lookup.get(str(k), "")
+
+        return ordered
+    finally:
+        conn.close()
 
 # --- Logging Middleware ---
 @app.middleware("http")
@@ -305,6 +321,7 @@ async def chat(request: ChatRequest):
             _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": "extract_product_id", "args": {"query": text_q}, "product_id": pid})
             if pid:
                 name_map = _base_names_for_keys([pid])
+                print(f"[main] extract_product_id name_map={name_map} results={pid}")
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "extract_product_id", "results": [pid], "names": name_map})
                 return ChatResponse(base_random_keys=[pid])
 
@@ -313,7 +330,9 @@ async def chat(request: ChatRequest):
             _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": "extract_product_name", "args": {"query": text_q}, "name": pname})
             if pname:
                 results = bm25_search(pname, k=5) or []
+                print(f"bm25_search results: {results}")
                 name_map = _base_names_for_keys(results)
+                print(f"bm25_search results {results}, name_map: {name_map}")
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": pname, "results": results[:10], "names": name_map})
                 if results:
                     return ChatResponse(base_random_keys=results)
@@ -536,6 +555,7 @@ async def chat(request: ChatRequest):
             if function_name == "bm25_search":
                 results = function_to_call(query=function_args.get("query"))
                 name_map = _base_names_for_keys(results or [])
+                print(f"[main] bm25_search name_map={name_map} results={results[:10]}")
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": results[:10] if results else [], "names": name_map})
                 return ChatResponse(base_random_keys=results)
             # bm25_llm_search branch removed
@@ -557,6 +577,7 @@ async def chat(request: ChatRequest):
                         rb_top = rb[0]
                         merged.extend([rk for rk in rb if rk not in merged])
                 name_map = _base_names_for_keys(merged)
+                print(f"[main] comparison_extract_products name_map={name_map} merged={merged[:10]}")
                 _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "comparison_candidates", "a_top": ra_top, "b_top": rb_top, "all": merged[:10], "names": name_map})
                 # If we have both top candidates, run compare tool
                 if ra_top and rb_top:
@@ -585,6 +606,7 @@ async def chat(request: ChatRequest):
                     results = bm25_search(name, k=5) or []
                     print(f"[main] bm25_search name={name} results={results}")
                     name_map = _base_names_for_keys(results)
+                    print(f"[main] bm25_search name_map={name_map} results={results}")
                     _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": "bm25_search", "query": name, "results": results[:10], "names": name_map})
                     return ChatResponse(base_random_keys=results)
                 # fallback to bm25_llm_search on full query
