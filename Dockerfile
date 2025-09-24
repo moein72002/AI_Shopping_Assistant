@@ -10,9 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
 
 WORKDIR /app
 
-# Install deps. Make sure requirements.txt includes "kaggle" and "python-dotenv"
+# Install deps with uv (faster, deterministic). Ensure uv is present.
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv && uv pip sync --system requirements.txt
 
 # --- MODIFIED SECTION ---
 # Include the Kaggle downloader directory so startup can locate it at runtime
@@ -28,7 +28,7 @@ COPY tests ./tests
 
 # --- Healthcheck & Key Validation ---
 # Run a simple test to confirm the app starts and is responsive
-RUN pip install pytest requests python-dotenv && pytest tests/test_api.py::test_sanity_check_ping
+RUN uv pip install --system pytest requests python-dotenv && pytest tests/test_api.py::test_sanity_check_ping
 
 # Optional: To validate the OpenAI key during build, you would need to
 # pass the key as a secret and run a test that makes a simple API call.

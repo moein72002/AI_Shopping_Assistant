@@ -8,6 +8,8 @@ import re
 import json
 from typing import Dict, List as _List
 from datetime import datetime
+import sqlite3
+import subprocess as _subp
 import logging
 import subprocess
 import sys
@@ -35,6 +37,64 @@ if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', Non
 load_dotenv()
 
 app = FastAPI()
+
+# --- Per-chat logging helpers ---
+def _append_chat_log(chat_id: str, record: dict):
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logs_dir = os.path.join(base_dir, "logs")
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir, exist_ok=True)
+        path = os.path.join(logs_dir, f"{chat_id}.log")
+        payload = {
+            "timestamp": datetime.utcnow().isoformat(),
+            **record,
+        }
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        # Never fail request due to logging issues
+        pass
+
+def _reset_chat_log(chat_id: str):
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logs_dir = os.path.join(base_dir, "logs")
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir, exist_ok=True)
+        path = os.path.join(logs_dir, f"{chat_id}.log")
+        # Truncate (overwrite) the log file for this chat_id at the start of each request
+        with open(path, "w", encoding="utf-8"):
+            pass
+    except Exception:
+        pass
+
+
+def _base_names_for_keys(keys: _List[str]) -> Dict[str, str]:
+    """Use scripts/show_product.py to resolve names so behavior matches the script's view of the DB."""
+    out: Dict[str, str] = {}
+    if not keys:
+        return out
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    script = os.path.join(base_dir, "scripts", "show_product.py")
+    py = sys.executable
+    for rk in keys:
+        try:
+            proc = _subp.run(
+                [py, script, rk, "--name-only-json"],
+                cwd=base_dir,
+                stdout=_subp.PIPE,
+                stderr=_subp.PIPE,
+                text=True,
+                timeout=5,
+            )
+            if proc.returncode == 0:
+                data = json.loads(proc.stdout.strip() or "{}")
+                name = data.get("name") or ""
+                out[rk] = name
+        except Exception:
+            out[rk] = ""
+    return out
 
 # --- Logging Middleware ---
 @app.middleware("http")
@@ -214,6 +274,9 @@ async def chat(request: ChatRequest):
         if last_msg.type == "text":
             txt = (last_msg.content or "").strip()
             lowered = txt.lower()
+            # Initialize per-request log by truncating previous content for this chat_id
+            _reset_chat_log(request.chat_id)
+            _append_chat_log(request.chat_id, {"stage": "sanity_check", "text": txt})
             if lowered == "ping":
                 return ChatResponse(message="pong")
             if lowered.startswith("return base random key:"):
@@ -226,7 +289,7 @@ async def chat(request: ChatRequest):
         pass
 
     user_query = request.messages[-1].content
-
+    
     # Maintain sliding window history (keep last 10 messages total)
     history = chat_histories.get(request.chat_id, [])
     history.append({"role": "user", "content": user_query})
@@ -236,24 +299,26 @@ async def chat(request: ChatRequest):
 
     # No scenario-specific heuristics beyond sanity checks; rely on LLM tool-calling
     
+    # --- Test-mode bypass: disable router LLM and run bm25_llm_search directly ---
+    if os.environ.get("DISABLE_ROUTER_LLM") == "1":
+        try:
+            from tools.bm25_llm_tool import bm25_llm_search as _bm25_llm_search
+            k = 10
+            results = _bm25_llm_search(user_query.strip(), k=k)
+            _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "bm25_llm_search", "query": user_query, "results": results[:10] if results else []})
+            if not results:
+                # Fallback to semantic vector search to ensure we return candidates in tests
+                vec = vector_search(user_query.strip(), k=5)
+                _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "vector_search", "query": user_query, "results": vec[:10] if vec else []})
+                return ChatResponse(base_random_keys=vec or None)
+            return ChatResponse(base_random_keys=results)
+        except Exception:
+            pass
+
     # --- New Tool-Based Intent Router ---
     client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=20)
 
     tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "vector_search",
-                "description": "Searches for products based on a descriptive query. Use for general or semantic searches.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "The user's search query, e.g., 'a red shirt for summer'"},
-                    },
-                    "required": ["query"],
-                },
-            },
-        },
         {
             "type": "function",
             "function": {
@@ -272,11 +337,11 @@ async def chat(request: ChatRequest):
             "type": "function",
             "function": {
                 "name": "bm25_llm_search",
-                "description": "LLM-augmented BM25S search. The LLM extracts brand/model/codes and creates 1-3 concise sub-queries, then BM25S retrieves matching products. Prefer this when queries contain numbers, codes, or more than one product.",
+                "description": "LLM-augmented BM25S search. The LLM extracts brand/model/codes and creates 1-3 concise sub-queries, then BM25S retrieves matching products. Prefer this when queries contain numbers, codes, English tokens, or more than one product.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Original user query (Persian/English)."},
+                        "query": {"type": "string", "description": "Original user query (Persian/English). The tool will also include the raw query verbatim as a sub-query to prevent over-pruning by the LLM."},
                         "k": {"type": "integer", "description": "Max results to return (<=10).", "default": 5}
                     },
                     "required": ["query"],
@@ -358,6 +423,7 @@ async def chat(request: ChatRequest):
                 "Your action: Call `get_min_price_by_product_name(product_name='محصول X')`. \n"
                 "--- \n"
                 "Other Rules: \n"
+                "- If the query resembles a product-finding request (mentions a product type, brand, or model), you MUST return product candidates now. Always prefer `bm25_llm_search` over `vector_search` for finding products. Do NOT ask clarifying questions in the first turn if you can produce candidates. \n"
                 "- Otherwise use vector_search for discovery or ranking. \n"
                 "- Prefer bm25_llm_search when the query contains explicit numbers/codes (e.g., model codes, sizes) or mentions multiple specific products to compare; this tool will extract concise lexical sub-queries and retrieve matching products via BM25S. \n"
                 "- If the request is ambiguous, respond with one short clarifying question. \n"
@@ -373,6 +439,7 @@ async def chat(request: ChatRequest):
         )
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
+        _append_chat_log(request.chat_id, {"stage": "router_response", "message": getattr(response_message, "content", None), "tool_calls": [tc.function.name for tc in (tool_calls or [])]})
 
         if tool_calls:
             available_functions = {
@@ -388,12 +455,12 @@ async def chat(request: ChatRequest):
             function_name = tool_call.function.name
             function_to_call = available_functions[function_name]
             function_args = json.loads(tool_call.function.arguments)
+            _append_chat_log(request.chat_id, {"stage": "tool_call", "tool": function_name, "args": function_args})
 
-            if function_name == "vector_search":
+            if function_name == "bm25_search":
                 results = function_to_call(query=function_args.get("query"))
-                return ChatResponse(base_random_keys=results)
-            elif function_name == "bm25_search":
-                results = function_to_call(query=function_args.get("query"))
+                name_map = _base_names_for_keys(results or [])
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": results[:10] if results else [], "names": name_map})
                 return ChatResponse(base_random_keys=results)
             elif function_name == "bm25_llm_search":
                 k = function_args.get("k", 5)
@@ -401,9 +468,13 @@ async def chat(request: ChatRequest):
                     k = 5
                 k = min(k, 10)
                 results = function_to_call(query=function_args.get("query"), k=k)
+                name_map = _base_names_for_keys(results or [])
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": results[:10] if results else [], "names": name_map})
                 return ChatResponse(base_random_keys=results)
             elif function_name == "get_product_by_code":
                 result = function_to_call(product_code=function_args.get("product_code"))
+                name_map = _base_names_for_keys([result] if result else [])
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "results": [result] if result else [], "names": name_map})
                 return ChatResponse(base_random_keys=[result] if result else [])
             elif function_name == "get_product_feature":
                 result = function_to_call(
@@ -413,6 +484,7 @@ async def chat(request: ChatRequest):
                 # Append assistant message to history
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "message": result})
                 return ChatResponse(message=result)
             elif function_name == "get_min_price_by_product_name":
                 result = function_to_call(
@@ -420,11 +492,13 @@ async def chat(request: ChatRequest):
                 )
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "message": result})
                 return ChatResponse(message=result)
             elif function_name == "text_to_sql":
                 result = function_to_call(query=function_args.get("query"))
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(result)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                _append_chat_log(request.chat_id, {"stage": "tool_result", "tool": function_name, "message": result})
                 return ChatResponse(message=result)
 
         # No tool call: return assistant's content if present (clarifying question or direct answer)
@@ -432,12 +506,15 @@ async def chat(request: ChatRequest):
             content_text = response_message.content
             chat_histories[request.chat_id].append({"role": "assistant", "content": content_text})
             chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+            _append_chat_log(request.chat_id, {"stage": "final_message", "message": content_text})
             return ChatResponse(message=content_text)
 
     except Exception as e:
         # Fallback to vector search on any failure
         print(f"Tool-based router failed: {e}. Defaulting to vector search.")
+        _append_chat_log(request.chat_id, {"stage": "router_error", "error": str(e)})
         results = vector_search(user_query.strip(), k=5)
+        _append_chat_log(request.chat_id, {"stage": "fallback_vector", "results": results[:10] if results else []})
         return ChatResponse(base_random_keys=results)
     
     # Default fallback if no tool is called
