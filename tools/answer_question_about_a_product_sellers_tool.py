@@ -2,7 +2,7 @@ import os
 import sqlite3
 from typing import Optional, Dict, Any
 import json
-
+from utils.utils import _append_chat_log
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
@@ -81,7 +81,7 @@ def _rule_based_answer(question_lower: str, facts: Dict[str, Any]) -> Optional[s
     return None
 
 
-def answer_question_about_a_product_sellers(product_id: str, question: str) -> str:
+def answer_question_about_a_product_sellers(chat_id: str, product_id: str, question: str) -> str:
     """
     Answer questions about sellers (price, availability, Torob warranty, shop score) for a base product.
     Returns a concise Persian string. For purely numeric requests (e.g., min price), returns just the number.
@@ -124,6 +124,7 @@ def answer_question_about_a_product_sellers(product_id: str, question: str) -> s
             )
             content = (resp.choices[0].message.content or "").strip()
             if content:
+                _append_chat_log(chat_id, {"stage": "tool_result", "function_name": "answer_question_about_a_product_sellers", "product_id": product_id, "question": question, "product_facts": facts, "answer": content})
                 return content
         except Exception:
             pass

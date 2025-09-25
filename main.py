@@ -272,7 +272,7 @@ async def chat(request: ChatRequest):
         pid = extract_product_id(q or "")
         if pid:
             return pid
-        name = extract_product_name(q or "")
+        name = extract_product_name(request.chat_id, q or "")
         if name:
             # If the extractor accidentally returned an id-like token, validate via extract_product_id
             pid2 = extract_product_id(name)
@@ -368,7 +368,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 pid = _resolve_base_id(user_query)
                 _append_chat_log(request.chat_id, {"stage": "scenario2_resolve", "pid": pid})
 
-                ans = answer_question_about_a_product(product_id=pid, question=user_query)
+                ans = answer_question_about_a_product(request.chat_id, product_id=pid, question=user_query)
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(ans)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
                 return ChatResponse(message=ans)
@@ -377,7 +377,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 # Scenario 3: resolve product id -> answer about sellers
                 pid = _resolve_base_id(user_query)
                 _append_chat_log(request.chat_id, {"stage": "scenario3_resolve", "pid": pid})
-                ans = answer_question_about_a_product_sellers(product_id=pid, question=user_query)
+                ans = answer_question_about_a_product_sellers(request.chat_id, product_id=pid, question=user_query)
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(ans)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
                 return ChatResponse(message=ans)
@@ -385,7 +385,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
             if scenario_num == 4:
                 # Scenario 4: conversational narrowing, then return member_random_key
                 if remaining_turns <= 1:
-                    name = extract_product_name(user_query or "")
+                    name = extract_product_name(request.chat_id, user_query or "")
                     # Last turn: pick a best candidate from the latest user text
                     cands = bm25_search(request.chat_id, name or "", k=5) or []
                     _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})

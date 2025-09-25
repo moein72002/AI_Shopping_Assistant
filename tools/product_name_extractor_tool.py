@@ -1,9 +1,10 @@
 import json
 import os
 from typing import Optional
+from utils.utils import _append_chat_log
 
 
-def extract_product_name(query: str) -> Optional[str]:
+def extract_product_name(chat_id: str, query: str) -> Optional[str]:
     """
     English Prompt:
     Extract a single product name mentioned in the user query (non-comparison).
@@ -88,6 +89,7 @@ def extract_product_name(query: str) -> Optional[str]:
         name = content
         data = json.loads(content or "{}")
         name = (data.get("name") or [])[0] or ""
+        _append_chat_log(chat_id, {"stage": "tool_result", "function_name": "extract_product_name", "query": query, "name": name})
         return name or None
     except Exception:
         return None

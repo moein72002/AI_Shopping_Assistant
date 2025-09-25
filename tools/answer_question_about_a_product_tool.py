@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 from typing import Dict, Optional
+from utils.utils import _append_chat_log
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -66,7 +67,7 @@ def _truncate_values(d: Dict, max_len: int = 160) -> Dict:
     return out
 
 
-def answer_question_about_a_product(product_id: str, question: str) -> str:
+def answer_question_about_a_product(chat_id: str, product_id: str, question: str) -> str:
     """
     Retrieve product data by base `product_id` and ask a small LLM to answer the user's
     question strictly based on that data. Returns a concise Persian answer.
@@ -114,6 +115,7 @@ def answer_question_about_a_product(product_id: str, question: str) -> str:
             )
             content = (resp.choices[0].message.content or "").strip()
             if content:
+                _append_chat_log(chat_id, {"stage": "tool_result", "function_name": "answer_question_about_a_product", "product_id": product_id, "question": question, "product_data": data, "answer": content})
                 return content
         except Exception:
             pass
