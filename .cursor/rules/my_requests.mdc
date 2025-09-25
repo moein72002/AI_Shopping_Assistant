@@ -9,9 +9,9 @@ From now on, I will write my request in the my_reuquests.mdc. Check my requests 
 
 Use UV instead of pip in the dockerfile.
 
-faiss indices are too large and it take too long to load all of them, and 30s timeout happens. What do you suggest to fix this problem?
+faiss indices are too large and it take too long to load all of them, and 30s timeout happens. What do you suggest to fix this problem? I think it would be good to store faiss indices on the RAM.
 
-Delete vector_search from LLM agent available tools.
+Delete vector_search from LLM agent available tools and everywhere else (specially mdc files).
 
 Improve tools description so that the LLM can more intelligently select tools.
 
@@ -28,3 +28,27 @@ In scenario2 tests (available in .\server_tests\scenario2.json) user has a quest
 Scenario 5: ID of the product (6-digit lowercase) may be next to its name in the requests in scenario 5 requests. If both of the product IDs are in the request, these two IDs should be passed to the compare_two_products_tool directly. If only the ID of one product is available in the comparison request, the comparison_extractor_tool should return the ID of that product instead of its name, and the bm25_tool should always check its input to return the input itself if it is only a product id (6-digit lowercase).
 
 Maybe I can do the export name task using the router LLM agent.
+
+Use markdown in prompts.
+
+I think I don't need passing current tools to LLM agent anymore. I have updated its system prompt in which its only task is to understand the question's scenario. Then, return only sth like scenario_number = 3.
+
+In scenario 5 there may be more than two products to compare. I should modify name extractor for this scenario.
+
+If id of a product (6 lowercase letters) is available in the query extract_product_name should return only the id of the product and nothing else.
+
+Can I cache fixed parts of prompts to boost speed of LLM call?
+
+-----
+In scenarios 2 and 3 there shouldn't be any clarification questions and we should respond to the query immediately. I have deleted "# Ask for clarification to identify the exact product" part in scenarios 2 and 3 in main.py.
+
+Scenario 4 should enter a loop and tell LLM the step to make sure to know the remaining turns. I think it is always better to return the response after the fifth user request, because we can gain more info about the requested product. Therefore, we can make sure that we have found the correct product.
+
+I have updated the calculation process of remaining_turns. Now remaining_turns is calculated based on the number of user queries in the current chat.
+
+pick_best_member_for_base shouldn't always return the member with the lowest price. Instead, it should ask about the price and the seller's attributes (e.g. has_warranty) to find the shop that the user want to buy the product from. In the end, the output of our service should be member_random_keys. Check the description of scenario 4 as well.
+
+comparison_extract_products should be modified in a way that it can extract two or more names from the query (now it extracts exactly two products, but there may be more than two products). In addition, comparison_extract_products should consider that if a product ID (6 lowercase letters) is given (next to its name) inside the user query, it should only return the product ID instead of its name. Then, only that product (the product whose ID is in the query) will skip bm25_search.
+Based on the fact that in scenario 5, there may be more than two products, compare_two_products should be modified to handle more than two products.
+
+This simulates the case where the name and other information of the shop are given to the user, and the user approves or rejects it.

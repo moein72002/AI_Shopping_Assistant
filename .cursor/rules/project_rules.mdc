@@ -53,7 +53,7 @@ This document outlines the purpose of each key markdown file in the repository. 
     -   **When to use**: Before making LLM calls, to ensure you are using a compatible API signature.
 
 
-Important Rules:
+## Important Rules:
 - When using API key make sure that the cost of running is not over $0.10 in total.
 
 - When creating system prompt always make sure to include both English version and Translated Persian version of the system prompt. I realized that becuase the query is in the Persian Language, this helps.

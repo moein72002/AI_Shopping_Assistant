@@ -307,6 +307,9 @@ async def chat(request: ChatRequest):
     from tools.product_id_lookup_tool import extract_product_id
     from tools.answer_question_about_a_product_tool import answer_question_about_a_product
     from tools.compare_two_products_tool import compare_two_products
+    from tools.answer_question_about_a_product_sellers_tool import answer_question_about_a_product_sellers
+    from tools.ask_clarifying_questions_tool import ask_clarifying_questions
+    from tools.member_picker_tool import pick_best_member_for_base
 
     # No precheck heuristics; rely on router tool-calling entirely
 
@@ -314,8 +317,8 @@ async def chat(request: ChatRequest):
     history = chat_histories.get(request.chat_id, [])
     history.append({"role": "user", "content": user_query})
     chat_histories[request.chat_id] = history[-10:]
-    assistant_count = sum(1 for m in chat_histories[request.chat_id] if m.get("role") == "assistant")
-    remaining_turns = max(0, 5 - assistant_count)
+    user_queries_count = sum(1 for m in chat_histories[request.chat_id] if m.get("role") == "user")
+    remaining_turns = max(0, 5 - user_queries_count)
 
     # No scenario-specific heuristics beyond sanity checks; rely on LLM tool-calling
     
@@ -333,10 +336,190 @@ async def chat(request: ChatRequest):
         except Exception:
             pass
 
-    # --- New Tool-Based Intent Router ---
+    # --- LLM: Classify scenario first ---
     from openai import OpenAI
     client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=20)
 
+    # Helper to find a single base product id using id/name -> bm25
+    def _resolve_base_id(q: str) -> Optional[str]:
+        pid = extract_product_id(q or "")
+        if pid:
+            return pid
+        name = extract_product_name(q or "")
+        if name:
+            # If the extractor accidentally returned an id-like token, validate via extract_product_id
+            pid2 = extract_product_id(name)
+            if pid2:
+                return pid2
+            # Else search by name
+            results = bm25_search(name, k=5) or []
+            return results[0] if results else None
+
+        # TODO: Check below
+        # Fallback: bm25 on full query
+        results = bm25_search(q or "", k=5) or []
+        return results[0] if results else None
+
+    # Ask LLM to classify into scenario 1..5
+    scenario_num: Optional[int] = None
+    try:
+        cls_system_message = {
+            "role": "system",
+            "content": (
+                """
+You are an expert AI assistant for Torob. Your **sole purpose** is to analyze the user's request (user requests are in Persian language), classify it into one of the five scenarios described below, and return **only the scenario number**.
+
+## **Primary Rule**
+Your response must be in the exact format: `scenario_number = X`, where `X` is the number of the matching scenario. **Do not provide any other text, explanation, or formatting.**
+
+---
+
+## **Scenarios**
+
+### **Scenario 1: Direct Product Lookup**
+-   **Description:** The user is looking for a specific product and provides a clear, unambiguous name or product code.
+-   **Example Query:** `"لطفاً دراور چهار کشو (کد D14) را برای من تهیه کنید."`
+-   **Your Output for this Example:** `scenario_number = 1`
+
+---
+
+### **Scenario 2: Product Feature Question**
+-   **Description:** The user asks a factual question about the attributes or specifications of a specific, named product (e.g., dimensions, material, technical details).
+-   **Example Query:** `"عرض پارچه تریکو جودون 1/30 لاکرا گردباف نوریس به رنگ زرد طلایی چقدر است؟"`
+-   **Your Output for this Example:** `scenario_number = 2`
+
+---
+
+### **Scenario 3: Seller & Price Question**
+-   **Description:** The user asks a question about the commercial aspects of a specific, named product, such as its **price**, availability, sellers, or warranty.
+-   **Example Query:** `"کمترین قیمت در این پایه برای گیاه طبیعی بلک گلد بنسای نارگل کد ۰۱۰۸ چقدر است؟"`
+-   **Your Output for this Example:** `scenario_number = 3`
+
+---
+
+### **Scenario 4: Guided Product Discovery**
+-   **Description:** The user has a vague or general request for a product category and needs help narrowing down their options. They are not asking about a specific, named item.
+-   **Example Query:** `"نبال یه میز تحریر هستم که برای کارهای روزمره و نوشتن مناسب باشه."`
+-   **Your Output for this Example:** `scenario_number = 4`
+
+---
+
+### **Scenario 5: Product Comparison**
+-   **Description:** The user explicitly asks to compare two or more specific, named products.
+-   **Example Query:** `"کدام یک از این ماگ‌های خرید ماگ-لیوان هندوانه فانتزی و کارتونی کد 1375 یا ماگ لته خوری سرامیکی با زیره کد 741 مناسب‌تر است؟"`
+-   **Your Output for this Example:** `scenario_number = 5`
+                """
+            ),
+        }
+        model_messages = [cls_system_message] + (history[-10:])
+        cls_resp = client.chat.completions.create(
+            model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
+            messages=model_messages,
+            timeout=10,
+        )
+        cls_text = (cls_resp.choices[0].message.content or "").strip()
+        _append_chat_log(request.chat_id, {"stage": "scenario_classification", "raw": cls_text})
+        m = re.search(r"scenario_number\s*=\s*(\d)", cls_text)
+        if m:
+            scenario_num = int(m.group(1))
+    except Exception as _:
+        scenario_num = None
+
+    # Orchestrate flows per scenario if classified
+    if scenario_num in {1, 2, 3, 4, 5}:
+        try:
+            if scenario_num == 1:
+                # Scenario 1: extract product id and return it
+                pid = _resolve_base_id(user_query)
+                _append_chat_log(request.chat_id, {"stage": "scenario1_resolve", "pid": pid})
+                return ChatResponse(base_random_keys=[pid] if pid else None)
+
+            if scenario_num == 2:
+                # Scenario 2: resolve product id -> answer about product
+                pid = _resolve_base_id(user_query)
+                _append_chat_log(request.chat_id, {"stage": "scenario2_resolve", "pid": pid})
+
+                ans = answer_question_about_a_product(product_id=pid, question=user_query)
+                chat_histories[request.chat_id].append({"role": "assistant", "content": str(ans)})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                return ChatResponse(message=ans)
+
+            if scenario_num == 3:
+                # Scenario 3: resolve product id -> answer about sellers
+                pid = _resolve_base_id(user_query)
+                _append_chat_log(request.chat_id, {"stage": "scenario3_resolve", "pid": pid})
+                ans = answer_question_about_a_product_sellers(product_id=pid, question=user_query)
+                chat_histories[request.chat_id].append({"role": "assistant", "content": str(ans)})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                return ChatResponse(message=ans)
+
+            if scenario_num == 4:
+                # Scenario 4: conversational narrowing, then return member_random_key
+                if remaining_turns <= 1:
+                    name = extract_product_name(user_query or "")
+                    # Last turn: pick a best candidate from the latest user text
+                    cands = bm25_search(name or "", k=5) or []
+                    _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
+                    if cands:
+                        best_member = pick_best_member_for_base(cands[0])
+                        if best_member:
+                            return ChatResponse(member_random_keys=[best_member])
+                    # Fallback no candidates: ask one final question
+                    q = ask_clarifying_questions(user_query)
+                    chat_histories[request.chat_id].append({"role": "assistant", "content": q})
+                    chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                    return ChatResponse(message=q)
+
+                # Not final turn: ask a clarifying question first if this is the first assistant turn
+                if assistant_count == 0:
+                    q = ask_clarifying_questions(user_query)
+                    chat_histories[request.chat_id].append({"role": "assistant", "content": q})
+                    chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                    _append_chat_log(request.chat_id, {"stage": "scenario4_clarify", "q": q})
+                    return ChatResponse(message=q)
+
+                # Subsequent turns: try searching based on latest constraints and pick a member
+                cands = bm25_search(user_query.strip(), k=5) or []
+                _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
+                if cands:
+                    best_member = pick_best_member_for_base(cands[0])
+                    if best_member:
+                        return ChatResponse(member_random_keys=[best_member])
+                # If still nothing, ask another clarifying question
+                q = ask_clarifying_questions(user_query)
+                chat_histories[request.chat_id].append({"role": "assistant", "content": q})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                return ChatResponse(message=q)
+
+            if scenario_num == 5:
+                # Scenario 5: extract products -> bm25 -> compare -> return winner id and reason
+                pair = comparison_extract_products(user_query)
+                _append_chat_log(request.chat_id, {"stage": "scenario5_pair", "pair": pair})
+                ra_top: Optional[str] = None
+                rb_top: Optional[str] = None
+                if pair.get("product_a"):
+                    ra = bm25_search(pair["product_a"], k=5) or []
+                    if ra:
+                        ra_top = ra[0]
+                if pair.get("product_b"):
+                    rb = bm25_search(pair["product_b"], k=5) or []
+                    if rb:
+                        rb_top = rb[0]
+                if ra_top and rb_top:
+                    winner_id, reason_fa = compare_two_products(ra_top, rb_top, user_query)
+                    _append_chat_log(request.chat_id, {"stage": "scenario5_compare", "winner": winner_id, "reason": reason_fa})
+                    if winner_id:
+                        return ChatResponse(message=reason_fa, base_random_keys=[winner_id])
+                # Fallback: return any found candidates
+                merged = [rk for rk in [ra_top, rb_top] if rk]
+                return ChatResponse(base_random_keys=merged or None)
+        except Exception as e:
+            _append_chat_log(request.chat_id, {"stage": "scenario_flow_error", "error": str(e)})
+            # Graceful fallback to bm25
+            results = bm25_search(user_query.strip(), k=5)
+            return ChatResponse(base_random_keys=results)
+
+    # --- Fallback: original tool-based router (kept for resilience) ---
     tools = [
         {
             "type": "function",
@@ -490,39 +673,47 @@ async def chat(request: ChatRequest):
             "role": "system",
             "content": (
                 """
-                "You are a expert AI Shopping Assistant of Torob (a platform for buying and selling products). \n"
-                Scenario 1: In this scenario, the user is looking for a specific product from Torob (the user's query can be mapped exactly to a Torob base).
-                Flow: extract_product_id (using bm25_search and extract_product_name tools) -> return product id
+                You are an expert AI assistant for Torob. Your **sole purpose** is to analyze the user's request, classify it into one of the five scenarios described below, and return **only the scenario number**.
 
-                Scenario 2: In this scenario, the user has a question about a specific product from Torob (the user's query can be mapped exactly to a Torob base product).
-                Flow: extract_product_id (using bm25_search and extract_product_name tools) -> answer_question_about_a_product (using query and product id) -> return answer
-                
-                Scenario 3: In this scenario, the user has a question about the sellers (price, availability, torob warranty, etc.) of a specific base from Torob (the user's query can be mapped exactly to a Torob base product).
-                Flow: extract_product_id (using bm25_search and extract_product_name tools) -> answer_question_about_a_product_sellers (using query and product id) -> return answer
+                ## **Primary Rule**
+                Your response must be in the exact format: `scenario_number = X`, where `X` is the number of the matching scenario. **Do not provide any other text, explanation, or formatting.**
 
-                Scenario 4: In this scenario, the user is looking for a specific product, but the initial query cannot be linked to a specific product. The assistant must help the user reach their goal by asking questions.
-                Flow: ask_clarifying_questions (using ask_clarifying_questions tool) -> search_products (using bm25_search tool) -> ask more clarifying questions based on the product candidates -> finally return product id from member table (member_random_key) in at most 5 assistant messages.
+                ---
 
-                Scenario 5: In this scenario, the user is comparing two products from Torob (the user's query can be mapped exactly to two Torob base products that are being compared).
-                Flow: comparison_extract_products (using query) -> bm25_search (using product_a and product_b) -> compare_two_products (using product_id_a and product_id_b and user query) -> return winner and the reason based on the user query and the products features and prices.
+                ## **Scenarios**
 
-                ask_clarifying_questions tool should ask a lot of questions to help the user find the product.
+                ### **Scenario 1: Direct Product Lookup**
+                -   **Description:** The user is looking for a specific product and provides a clear, unambiguous name or product code.
+                -   **Example Query:** `"لطفاً دراور چهار کشو (کد D14) را برای من تهیه کنید."`
+                -   **Your Output for this Example:** `scenario_number = 1`
 
-                "Rule Priority: Your main goal is to help the user achieve their goal by selecting the appropriate scenario and flow for that scenario. If a query contains both a product identifier (like a code) and a question about a feature (like price or width), you MUST prioritize answering the feature question. \n"
-                "--- \n"
-                "1. **Product Identifier Rule**: If the user's query includes a 6-letter product id (e.g., 'gadgjv'), FIRST call `extract_product_id(query=...)`. If an id is returned, use it directly (skip the finding product process which contains using bm25_search and extract_product_name tools). If no id is present, you may call `extract_product_name(query=...)` to get a concise name and then use `bm25_search` tool with that name to find id of the product. \n"
-                "--- \n"
-                "2. **Price/Feature Rule**: If the user asks for minimum price, lowest price, or a specific feature, you MUST first identify the product. AFTER the product is found: for minimum price use `get_min_price_by_product_id`; otherwise call `answer_question_about_a_product(product_id=..., question=...)`. answer_question_about_a_product tool is used when the request has a question about a feature of the product about a specific product.\n"
-                "FEW-SHOT EXAMPLE: \n"
-                "User Query: 'کمترین قیمت ... محصول X ... چقدر است؟' \n"
-                "Your action: Find product id via `extract_product_id` or `bm25_search` (after name extraction), then call `get_min_price_by_product_id(product_id=...)`. \n"
-                "--- \n"
-                "3. **Comparison Rule**: If the user's request compares two products (e.g., 'A vs B', 'which is better, A or B', or a sentence clearly mentioning two product names/models), FIRST call `comparison_extract_products(query=...)` to get `product_a` and `product_b`. THEN call `bm25_search` separately for each extracted name to get top candidate ids. FINALLY call `compare_two_products(product_id_a=..., product_id_b=..., user_query=...)` to select the winner and provide a short Persian reason. Return the winning id in base_random_keys. \n"
-                "--- \n"
-                "Other Rules: \n"
-                "- If the query resembles only a product-finding request (mentions a product type, brand, or model - there is no question about a feature or sellers of the product) in which the product is unique based on the given information and the user doesn't need help in finding the product, you MUST return product candidates now. Prefer `extract_product_name` followed by `bm25_search`. Do NOT ask clarifying questions in the first turn if you can find the product exactly with given information. \n"
-                "- If the request is ambiguous (no clear product), ask one short clarifying question to help the user find the product exactly based on his contstraints. \n"
-                f"- You have at most 5 assistant messages per chat. Remaining assistant turns: {remaining_turns}. If you have no turns left, produce your best final answer using an appropriate tool."
+                ---
+
+                ### **Scenario 2: Product Feature Question**
+                -   **Description:** The user asks a factual question about the attributes or specifications of a specific, named product (e.g., dimensions, material, technical details).
+                -   **Example Query:** `"عرض پارچه تریکو جودون 1/30 لاکرا گردباف نوریس به رنگ زرد طلایی چقدر است؟"`
+                -   **Your Output for this Example:** `scenario_number = 2`
+
+                ---
+
+                ### **Scenario 3: Seller & Price Question**
+                -   **Description:** The user asks a question about the commercial aspects of a specific, named product, such as its **price**, availability, sellers, or warranty.
+                -   **Example Query:** `"کمترین قیمت در این پایه برای گیاه طبیعی بلک گلد بنسای نارگل کد ۰۱۰۸ چقدر است؟"`
+                -   **Your Output for this Example:** `scenario_number = 3`
+
+                ---
+
+                ### **Scenario 4: Guided Product Discovery**
+                -   **Description:** The user has a vague or general request for a product category and needs help narrowing down their options. They are not asking about a specific, named item.
+                -   **Example Query:** `"نبال یه میز تحریر هستم که برای کارهای روزمره و نوشتن مناسب باشه."`
+                -   **Your Output for this Example:** `scenario_number = 4`
+
+                ---
+
+                ### **Scenario 5: Product Comparison**
+                -   **Description:** The user explicitly asks to compare two or more specific, named products.
+                -   **Example Query:** `"کدام یک از این ماگ‌های خرید ماگ-لیوان هندوانه فانتزی و کارتونی کد 1375 یا ماگ لته خوری سرامیکی با زیره کد 741 مناسب‌تر است؟"`
+                -   **Your Output for this Example:** `scenario_number = 5`
                 """
             ),
         }
