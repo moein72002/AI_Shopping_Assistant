@@ -391,7 +391,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
 ---
 
 ### **Scenario 3: Seller & Price Question**
--   **Description:** The user asks a question about the commercial aspects of a specific, named product, such as its **price**, availability, sellers, or warranty.
+-   **Description:** The user asks a question about the sellers of a specific, named product, such as its **price**. The output (answer of the user's question) must be parsable as an `int` or `float`
 -   **Example Query:** `"کمترین قیمت در این پایه برای گیاه طبیعی بلک گلد بنسای نارگل کد ۰۱۰۸ چقدر است؟"`
 -   **Your Output for this Example:** `scenario_number = 3`
 
@@ -471,7 +471,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                     return ChatResponse(message=q)
 
                 # Not final turn: ask a clarifying question first if this is the first assistant turn
-                if assistant_count == 0:
+                if user_queries_count == 1:
                     q = ask_clarifying_questions(user_query)
                     chat_histories[request.chat_id].append({"role": "assistant", "content": q})
                     chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
