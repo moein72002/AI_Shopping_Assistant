@@ -501,11 +501,12 @@ async def chat(request: ChatRequest):
                 Flow: extract_product_id (using bm25_search and extract_product_name tools) -> answer_question_about_a_product_sellers (using query and product id) -> return answer
 
                 Scenario 4: In this scenario, the user is looking for a specific product, but the initial query cannot be linked to a specific product. The assistant must help the user reach their goal by asking questions.
-                
+                Flow: ask_clarifying_questions (using ask_clarifying_questions tool) -> search_products (using bm25_search tool) -> ask more clarifying questions based on the product candidates -> finally return product id from member table (member_random_key) in at most 5 assistant messages.
 
+                Scenario 5: In this scenario, the user is comparing two products from Torob (the user's query can be mapped exactly to two Torob base products that are being compared).
+                Flow: comparison_extract_products (using query) -> bm25_search (using product_a and product_b) -> compare_two_products (using product_id_a and product_id_b and user query) -> return winner and the reason based on the user query and the products features and prices.
 
-                Scenario 5: In this scenario, the user is comparing two products from Torob (the user's query can be mapped exactly to two Torob base products that are compared).
-
+                ask_clarifying_questions tool should ask a lot of questions to help the user find the product.
 
                 "Rule Priority: Your main goal is to help the user achieve their goal by selecting the appropriate scenario and flow for that scenario. If a query contains both a product identifier (like a code) and a question about a feature (like price or width), you MUST prioritize answering the feature question. \n"
                 "--- \n"
