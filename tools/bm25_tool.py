@@ -6,6 +6,7 @@ from typing import List, Tuple
 import numpy as np
 
 import bm25s
+from utils.utils import _append_chat_log, _base_names_for_keys
 
 
 def _compose_text(persian: str | None, english: str | None) -> str:
@@ -78,10 +79,14 @@ def _ensure_searcher() -> BM25ProductSearcher:
     return _GLOBAL_SEARCHER
 
 
-def bm25_search(query: str, k: int = 5) -> List[str]:
+def bm25_search(chat_id: str, query: str, k: int = 5) -> List[str]:
     """Return the `random_key` values of the top 5 products for the given query."""
     searcher = _ensure_searcher()
-    return searcher.top_k_ids(query, k=k)
+    results = searcher.top_k_ids(query, k=k)
+    print(f"results: {results}")
+    name_map = _base_names_for_keys(results or [])
+    _append_chat_log(chat_id, {"stage": "tool_result", "results": results[:10] if results else [], "names": name_map})
+    return results
 
 
 def main() -> None:

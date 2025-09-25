@@ -8,6 +8,7 @@ import re
 import json
 from typing import Dict, List as _List
 from datetime import datetime
+from utils.utils import _append_chat_log, _reset_chat_log, _base_names_for_keys
 import sqlite3
 import subprocess as _subp
 import logging
@@ -37,80 +38,6 @@ if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', Non
 load_dotenv()
 
 app = FastAPI()
-
-# --- Per-chat logging helpers ---
-def _append_chat_log(chat_id: str, record: dict):
-    try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        logs_dir = os.path.join(base_dir, "logs")
-        if not os.path.exists(logs_dir):
-            os.makedirs(logs_dir, exist_ok=True)
-        path = os.path.join(logs_dir, f"{chat_id}.log")
-        payload = {
-            "timestamp": datetime.utcnow().isoformat(),
-            **record,
-        }
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        # Never fail request due to logging issues
-        pass
-
-def _reset_chat_log(chat_id: str):
-    try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        logs_dir = os.path.join(base_dir, "logs")
-        if not os.path.exists(logs_dir):
-            os.makedirs(logs_dir, exist_ok=True)
-        path = os.path.join(logs_dir, f"{chat_id}.log")
-        # Truncate (overwrite) the log file for this chat_id at the start of each request
-        with open(path, "w", encoding="utf-8"):
-            pass
-    except Exception:
-        pass
-
-
-def _base_names_for_keys(keys: _List[str]) -> Dict[str, str]:
-    """Return a mapping from `random_key` to product name.
-
-    Preference: use `persian_name` if non-empty, else `english_name`.
-    """
-    if not keys:
-        return {}
-
-    db_path = os.path.join(os.path.dirname(__file__), "torob.db")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    try:
-        cur = conn.cursor()
-        # First fetch all unique ids -> name into a lookup
-        lookup: Dict[str, str] = {}
-
-        unique_keys = list(dict.fromkeys(keys))
-        chunk_size = 900
-        for i in range(0, len(unique_keys), chunk_size):
-            chunk = unique_keys[i : i + chunk_size]
-            placeholders = ",".join(["?"] * len(chunk))
-            sql = (
-                "SELECT random_key, persian_name, english_name "
-                "FROM base_products WHERE random_key IN (" + placeholders + ")"
-            )
-            cur.execute(sql, chunk)
-            for row in cur.fetchall():
-                rid = str(row["random_key"])  # ensure str keys
-                pn = (row["persian_name"] or "").strip()
-                en = (row["english_name"] or "").strip()
-                name = pn if pn else en
-                lookup[rid] = name
-
-        # Now build an ordered mapping following the original input order
-        ordered: Dict[str, str] = {}
-        for k in keys:
-            ordered[str(k)] = lookup.get(str(k), "")
-
-        return ordered
-    finally:
-        conn.close()
 
 # --- Logging Middleware ---
 @app.middleware("http")
@@ -326,11 +253,11 @@ async def chat(request: ChatRequest):
     if os.environ.get("DISABLE_ROUTER_LLM") == "1":
         try:
             k = 10
-            results = bm25_search(user_query.strip(), k=k)
+            results = bm25_search(request.chat_id, user_query.strip(), k=k)
             _append_chat_log(request.chat_id, {"stage": "bypass_router", "tool": "bm25_search", "query": user_query, "results": results[:10] if results else []})
             if not results:
                 # Ensure k results via bm25 padding path
-                results = bm25_search(user_query.strip(), k=5)
+                results = bm25_search(request.chat_id, user_query.strip(), k=5)
                 return ChatResponse(base_random_keys=results or None)
             return ChatResponse(base_random_keys=results)
         except Exception:
@@ -352,12 +279,12 @@ async def chat(request: ChatRequest):
             if pid2:
                 return pid2
             # Else search by name
-            results = bm25_search(name, k=5) or []
+            results = bm25_search(request.chat_id, name, k=5) or []
             return results[0] if results else None
 
         # TODO: Check below
         # Fallback: bm25 on full query
-        results = bm25_search(q or "", k=5) or []
+        results = bm25_search(request.chat_id, q or "", k=5) or []
         return results[0] if results else None
 
     # Ask LLM to classify into scenario 1..5
@@ -411,6 +338,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 """
             ),
         }
+        print(f"Chat ID: {chat_id}")
         model_messages = [cls_system_message] + (history[-10:])
         cls_resp = client.chat.completions.create(
             model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
@@ -418,6 +346,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
             timeout=10,
         )
         cls_text = (cls_resp.choices[0].message.content or "").strip()
+        print(f"cls_text: {cls_text}")
         _append_chat_log(request.chat_id, {"stage": "scenario_classification", "raw": cls_text})
         m = re.search(r"scenario_number\s*=\s*(\d)", cls_text)
         if m:
@@ -458,7 +387,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 if remaining_turns <= 1:
                     name = extract_product_name(user_query or "")
                     # Last turn: pick a best candidate from the latest user text
-                    cands = bm25_search(name or "", k=5) or []
+                    cands = bm25_search(request.chat_id, name or "", k=5) or []
                     _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
                     if cands:
                         best_member = pick_best_member_for_base(cands[0])
@@ -479,7 +408,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                     return ChatResponse(message=q)
 
                 # Subsequent turns: try searching based on latest constraints and pick a member
-                cands = bm25_search(user_query.strip(), k=5) or []
+                cands = bm25_search(request.chat_id, user_query.strip(), k=5) or []
                 _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
                 if cands:
                     best_member = pick_best_member_for_base(cands[0])
@@ -498,11 +427,11 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 ra_top: Optional[str] = None
                 rb_top: Optional[str] = None
                 if pair.get("product_a"):
-                    ra = bm25_search(pair["product_a"], k=5) or []
+                    ra = bm25_search(request.chat_id, pair["product_a"], k=5) or []
                     if ra:
                         ra_top = ra[0]
                 if pair.get("product_b"):
-                    rb = bm25_search(pair["product_b"], k=5) or []
+                    rb = bm25_search(request.chat_id, pair["product_b"], k=5) or []
                     if rb:
                         rb_top = rb[0]
                 if ra_top and rb_top:
@@ -516,5 +445,5 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
         except Exception as e:
             _append_chat_log(request.chat_id, {"stage": "scenario_flow_error", "error": str(e)})
             # Graceful fallback to bm25
-            results = bm25_search(user_query.strip(), k=5)
+            results = bm25_search(request.chat_id, user_query.strip(), k=5)
             return ChatResponse(base_random_keys=results)

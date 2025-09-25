@@ -15,7 +15,7 @@ Delete vector_search from LLM agent available tools and everywhere else (special
 
 Improve tools description so that the LLM can more intelligently select tools.
 
-Run tests in .\scripts\run_scenarios_sample.py in paralel to boost speed. Add number of worker arg inside the script.
+Run tests in .\run_test_scripts\run_scenarios_sample.py in paralel to boost speed. Add number of worker arg inside the script.
 
 ------------------------------
 Scenario 1:
