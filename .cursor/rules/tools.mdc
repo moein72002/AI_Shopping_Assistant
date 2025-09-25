@@ -1,0 +1,166 @@
+---
+alwaysApply: false
+---
+
+available_functions = {
+                "bm25_search": bm25_search,
+                "comparison_extract_products": comparison_extract_products,
+                "extract_product_name": extract_product_name,
+                "extract_product_id": extract_product_id,
+                "get_product_feature": get_product_feature,
+                "get_min_price_by_product_name": get_min_price_by_product_name,
+                "get_min_price_by_product_id": get_min_price_by_product_id,
+                "text_to_sql": text_to_sql,
+                "answer_question_about_a_product": answer_question_about_a_product,
+                "compare_two_products": compare_two_products,
+            }
+
+# --- Fallback: original tool-based router (kept for resilience) ---
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "bm25_search",
+                "description": "Lexical search over product names/features. Use when query includes exact names, codes, ids.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Exactish name/code/id text to match lexically."}
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        # bm25_llm_search removed from router: use extract_product_name + bm25_search instead
+        {
+            "type": "function",
+            "function": {
+                "name": "comparison_extract_products",
+                "description": "Extracts the two product names from comparison-style queries (e.g., 'A vs B'). Returns product_a and product_b for subsequent search calls.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Original user query (Persian/English)."}
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "extract_product_name",
+                "description": "Extract a single product name (brand+model) from a non-comparison query; returns a concise lexical name to pass to bm25_llm_search.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"}
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "extract_product_id",
+                "description": "Extract a 6-letter product id (base_random_key) from the query and validate against DB.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"}
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "answer_question_about_a_product",
+                "description": "Answer a question about a specific product using its DB features and min price. Use when product id is known.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string", "description": "base_random_key of the product"},
+                        "question": {"type": "string", "description": "User question text"}
+                    },
+                    "required": ["product_id", "question"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "compare_two_products",
+                "description": "Given two base product ids (random_key) and the user's query, compare using DB features/prices and return the better product id and a short Persian reason.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_id_a": {"type": "string", "description": "First base product id (random_key)"},
+                        "product_id_b": {"type": "string", "description": "Second base product id (random_key)"},
+                        "user_query": {"type": "string", "description": "Original user query to guide comparison"}
+                    },
+                    "required": ["product_id_a", "product_id_b", "user_query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_product_feature",
+                "description": "Gets a specific feature of a named product. Use when the user asks for a specific attribute of a product.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_name": {"type": "string", "description": "The name of the product."},
+                        "feature_name": {"type": "string", "description": "The name of the feature to retrieve, e.g., 'عرض' or 'قیمت'."},
+                    },
+                    "required": ["product_name", "feature_name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_min_price_by_product_name",
+                "description": "(Legacy) Gets the lowest price by name; prefer get_min_price_by_product_id after the product is found.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_name": {"type": "string", "description": "The product name to match in the base catalog."}
+                    },
+                    "required": ["product_name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_min_price_by_product_id",
+                "description": "Gets the absolute lowest price for a product by base_random_key. Call only AFTER the product id is found via bm25_llm_search or extract_product_id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string", "description": "The 6-letter base_random_key."}
+                    },
+                    "required": ["product_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "text_to_sql",
+                "description": "Answers complex questions by generating and running a SQL query against the database. Use as a last resort for questions that other tools cannot answer.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "The user's full natural language query."},
+                    },
+                    "required": ["query"],
+                },
+            },
+        }
+    ]
+
