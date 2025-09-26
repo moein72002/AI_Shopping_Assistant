@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 import requests
 
 
-DEF_PROMPT_FA = "لطفا محصول موجود در تصویر را پیدا کن"
+DEF_PROMPT_FA = "این تصویر چیه؟"
 
 
 def load_items(path: str) -> List[Dict[str, Any]]:

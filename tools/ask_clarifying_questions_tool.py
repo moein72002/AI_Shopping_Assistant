@@ -21,7 +21,7 @@ def ask_clarifying_questions(context: str) -> str:
         )
         user_msg = f"Context:\n{context or ''}\n\nAsk one Persian question only."
         resp = client.chat.completions.create(
-            model=os.environ.get("LLM_CLARIFY_MODEL", "gpt-5-mini"),
+            model=os.environ.get("LLM_CLARIFY_MODEL", "gpt-4o-mini"),
             messages=[
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_msg},

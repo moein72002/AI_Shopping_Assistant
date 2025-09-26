@@ -1,4 +1,5 @@
 import os
+import time  # Import the time module
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -22,6 +23,9 @@ client = OpenAI(
 )
 
 try:
+    # Record the start time
+    start_time = time.time()
+
     # Create a chat completion
     chat_completion = client.chat.completions.create(
         messages=[
@@ -32,12 +36,19 @@ try:
                 """,
             }
         ],
-        model="gpt-5-mini",
+        model="gpt-4o-mini",
     )
 
-    # Print the response
+    # Record the end time
+    end_time = time.time()
+
+    # Calculate the duration
+    duration = end_time - start_time
+
+    # Print the response and the time taken
     print("LLM call successful!")
     print(chat_completion.choices[0].message.content)
+    print(f"\nLLM response time: {duration:.2f} seconds") # Print the formatted duration
 
 except Exception as e:
     print(f"An error occurred: {e}")

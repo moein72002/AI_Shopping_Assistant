@@ -551,11 +551,12 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 return ChatResponse(message=ans)
 
             if scenario_num == 4:
+                _append_chat_log(request.chat_id, {"stage": "scenario4_start", "remaining_turns": remaining_turns, "user_query": user_query})
                 # Scenario 4: conversational narrowing, then return member_random_key
                 if remaining_turns <= 1:
                     name = extract_product_name(request.chat_id, user_query or "")
                     # Last turn: pick a best candidate from the latest user text
-                    cands = bm25_search(request.chat_id, name or "", k=5) or []
+                    cands = bm25_search(request.chat_id, name or "", k=20) or []
                     _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
                     if cands:
                         best_member = pick_best_member_for_base(cands[0])
@@ -568,7 +569,11 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                     return ChatResponse(message=q)
 
                 # Not final turn: ask a clarifying question first if this is the first assistant turn
-                if user_queries_count == 1:
+                if remaining_turns == 4:
+                    name = extract_product_name(request.chat_id, user_query or "")
+                    # Last turn: pick a best candidate from the latest user text
+                    cands = bm25_search(request.chat_id, name or "", k=50) or []
+
                     q = ask_clarifying_questions(user_query)
                     chat_histories[request.chat_id].append({"role": "assistant", "content": q})
                     chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
@@ -590,20 +595,30 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
 
             if scenario_num == 5:
                 # Scenario 5: extract products -> bm25 -> compare -> return winner id and reason
-                pair = comparison_extract_products(user_query)
+                pair = comparison_extract_products(request.chat_id, user_query)
                 _append_chat_log(request.chat_id, {"stage": "scenario5_pair", "pair": pair})
                 ra_top: Optional[str] = None
                 rb_top: Optional[str] = None
                 if pair.get("product_a"):
-                    ra = bm25_search(request.chat_id, pair["product_a"], k=5) or []
-                    if ra:
-                        ra_top = ra[0]
+                    a_val = (pair["product_a"] or "").strip()
+                    if re.fullmatch(r"[a-z]{6}", a_val):
+                        ra_top = a_val
+                        _append_chat_log(request.chat_id, {"stage": "scenario5_id_detected_a", "id": ra_top})
+                    else:
+                        ra = bm25_search(request.chat_id, a_val, k=5) or []
+                        if ra:
+                            ra_top = ra[0]
                 if pair.get("product_b"):
-                    rb = bm25_search(request.chat_id, pair["product_b"], k=5) or []
-                    if rb:
-                        rb_top = rb[0]
+                    b_val = (pair["product_b"] or "").strip()
+                    if re.fullmatch(r"[a-z]{6}", b_val):
+                        rb_top = b_val
+                        _append_chat_log(request.chat_id, {"stage": "scenario5_id_detected_b", "id": rb_top})
+                    else:
+                        rb = bm25_search(request.chat_id, b_val, k=5) or []
+                        if rb:
+                            rb_top = rb[0]
                 if ra_top and rb_top:
-                    winner_id, reason_fa = compare_two_products(ra_top, rb_top, user_query)
+                    winner_id, reason_fa = compare_two_products(request.chat_id, ra_top, rb_top, user_query)
                     _append_chat_log(request.chat_id, {"stage": "scenario5_compare", "winner": winner_id, "reason": reason_fa})
                     if winner_id:
                         return ChatResponse(message=reason_fa, base_random_keys=[winner_id])

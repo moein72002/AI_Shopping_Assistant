@@ -101,7 +101,7 @@ You are an AI that refines search queries for a Persian e-commerce lexical searc
         user_msg = f"User query:\n{query}\nReturn only JSON."
 
         resp = client.chat.completions.create(
-            model=os.environ.get("LLM_BM25_MODEL", "gpt-5-mini"),
+            model=os.environ.get("LLM_BM25_MODEL", "gpt-4o-mini"),
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": sys_prompt},

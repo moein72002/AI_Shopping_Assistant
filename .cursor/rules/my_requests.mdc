@@ -21,6 +21,10 @@ decrease size of extract_product_name to make it faster.
 
 * set timeout not to continue with previous request.
 
+*** 30s timeout for responsding too
+
+add response_format={"type": "json_object"}, to llm calls
+
 ------------------------------
 Scenario 1:
 + add a LLM agent call and give top result of bm25_search to find the correct product between them.
@@ -48,6 +52,10 @@ In scenarios 2 and 3 there shouldn't be any clarification questions and we shoul
 -----------------------------
 Scenario 4:
 
+Use tfidf for distinguishing products?
+
+When second and ... requests come they should continue their flow in scenario 4 flow.
+
 In some requests the user wants a product, but they don't know the exact product. They want help to find the desired product with some constraints that they usually put in their request. The LLM agent should help the user find a product based on constraints by asking some clarifying questions. Maybe it would be good to search and gather some products that meet the initial constraints and then start to ask some clarifying questions based on features and price of those products. I think it would be good to create a find_product_that_needs_clarification tool. This tool
 
 Scenario 4 should enter a loop and tell LLM the current step to make sure to know the remaining turns. I think it is always better to return the response after the fifth user request, because we can gain more info about the requested product. Therefore, we can make sure that we have found the correct product.
@@ -62,7 +70,9 @@ This simulates the case where the name and other information of the shop are giv
 -----------------------------------
 Scenario 5:
 
-comparison_extract_products should consider that if a product ID (6 lowercase letters) is given (next to its name) inside the user query, it should only return the product ID instead of its name. Then, only that product (the product whose ID is in the query) will skip bm25_search.
+*** Answer without generating sql query because of time limit.
+
+comparison_extract_products should consider that if a product ID (6 lowercase letters) is given (next to its name) inside the user query, it should only return the product ID instead of its name. Then, only that product (the product whose ID is in the query) will skip bm25_search (becuase its id is already known).
 In scenario 5, compare_two_products should also a method like _generate_sql_for_sellers to generate sql query based on the request. Then, this generated sql query should be run for each of the products in the comparison and the results of this sql query should be give to the LLM agent to generate the final response and determining the winner product.
 
 <!-- comparison_extract_products should be modified in a way that it can extract two or more names from the query (now it extracts exactly two products, but there may be more than two products). In addition, 
