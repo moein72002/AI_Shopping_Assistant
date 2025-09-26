@@ -14,6 +14,7 @@ import subprocess as _subp
 import logging
 import subprocess
 import sys
+from tools.image_search import find_most_similar_product, warm_up_image_search
 
 # --- Logging Setup ---
 # Create a logger
@@ -226,6 +227,7 @@ async def maybe_download_kaggle_dataset():
 
         if not have_kaggle:
             print("[startup] Kaggle env vars not present; skipping all downloads")
+        warm_up_image_search()
     except Exception as _:
         # Non-fatal; app should still run
         print("[startup] Kaggle download failed (non-fatal)")
@@ -233,6 +235,7 @@ async def maybe_download_kaggle_dataset():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     chat_id = request.chat_id
+    _reset_chat_log(request.chat_id)
     
     # Scenario 0: Content-based health checks (chat_id can be random)
     try:
@@ -241,7 +244,6 @@ async def chat(request: ChatRequest):
             txt = (last_msg.content or "").strip()
             lowered = txt.lower()
             # Initialize per-request log by truncating previous content for this chat_id
-            _reset_chat_log(request.chat_id)
             _append_chat_log(request.chat_id, {"stage": "sanity_check", "text": txt})
             if lowered == "ping":
                 return ChatResponse(message="pong")
@@ -257,11 +259,13 @@ async def chat(request: ChatRequest):
     # --- Early handling for image-based scenarios (6 & 7) ---
     try:
         last_msg = request.messages[-1]
+        _append_chat_log(request.chat_id, {"stage": "image_search_start", "first_message_type": request.messages[0].type, "first_message_content": request.messages[0].content, "type": last_msg.type})
         if last_msg.type == "image":
+            _append_chat_log(request.chat_id, {"stage": "image_search_start_2", "type": last_msg.type})
             # Find most similar product by image
-            from tools.image_search import find_most_similar_product
             img_b64 = last_msg.content
-            product_id = find_most_similar_product(img_b64)
+            _append_chat_log(request.chat_id, {"stage": "image_search_start_3"})
+            product_id = find_most_similar_product(request.chat_id, img_b64)
             _append_chat_log(request.chat_id, {"stage": "image_search", "result": str(product_id)})
 
             # If image matching failed, return a graceful message
@@ -329,7 +333,7 @@ async def chat(request: ChatRequest):
             except Exception:
                 return ChatResponse(message="")
     except Exception:
-        pass
+        return ChatResponse(message="")
 
     user_query = request.messages[-1].content
     

@@ -7,7 +7,8 @@ __pycache__/
 # Ignore environment file
 .env
 
-
+products.index
+image_paths.json
 
 db_data/
 
