@@ -165,32 +165,67 @@ async def admin_page():
 
 @app.on_event("startup")
 async def maybe_download_kaggle_dataset():
-    """If torob.db is missing and Kaggle creds are present at runtime, download the dataset."""
+    """Ensure required Kaggle artifacts exist in project root: torob.db, product.index, image_paths.json."""
     try:
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "torob.db")
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(root_dir, "torob.db")
+        product_index_path = os.path.join(root_dir, "product.index")
+        image_paths_path = os.path.join(root_dir, "image_paths.json")
+
         force = os.environ.get("FORCE_KAGGLE_DOWNLOAD") == "1"
-        print(f"[startup] Kaggle download check: force={force}, db_exists={os.path.exists(db_path)}")
-        if os.path.exists(db_path) and not force:
-            print("[startup] Skipping Kaggle download (DB already exists and force is off)")
-            return
-        if os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"):
-            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "download_data_scripts", "download_data_from_kaggle.py")
+        have_kaggle = bool(os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"))
+
+        print(
+            f"[startup] Kaggle check: force={force}, have_kaggle={have_kaggle}, "
+            f"db_exists={os.path.exists(db_path)}, product_index_exists={os.path.exists(product_index_path)}, image_paths_exists={os.path.exists(image_paths_path)}"
+        )
+
+        # --- torob.db (database) ---
+        if (not os.path.exists(db_path) or force) and have_kaggle:
+            script_path = os.path.join(root_dir, "download_data_scripts", "download_data_from_kaggle.py")
             if os.path.exists(script_path):
-                # Run the downloader
-                print("[startup] Running Kaggle download script...")
-                subprocess.run([sys.executable, script_path], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
-                # Move produced DB into root if created in shopping_dataset/
-                produced = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shopping_dataset", "torob.db")
-                if os.path.exists(produced):
-                    try:
-                        os.replace(produced, db_path)
-                        print("[startup] Moved torob.db into app root")
-                    except Exception:
-                        pass
+                try:
+                    print("[startup] Downloading torob.db from Kaggle...")
+                    subprocess.run([sys.executable, script_path], check=True, cwd=root_dir)
+                    produced = os.path.join(root_dir, "shopping_dataset", "torob.db")
+                    if os.path.exists(produced):
+                        try:
+                            os.replace(produced, db_path)
+                            print("[startup] Moved torob.db into app root")
+                        except Exception:
+                            pass
+                except Exception as e:
+                    print(f"[startup] Failed to download torob.db: {e}")
             else:
-                print("[startup] Kaggle script not found; skipping")
-        else:
-            print("[startup] Kaggle env vars not present; skipping download")
+                print("[startup] Kaggle DB script not found; skipping torob.db download")
+
+        # --- product.index and image_paths.json (image search index) ---
+        needs_product_assets = (not os.path.exists(product_index_path) or not os.path.exists(image_paths_path) or force)
+        if needs_product_assets and have_kaggle:
+            script2_path = os.path.join(root_dir, "download_data_scripts", "download_product_index_from_kaggle.py")
+            if os.path.exists(script2_path):
+                try:
+                    print("[startup] Downloading product index assets from Kaggle...")
+                    subprocess.run([sys.executable, script2_path], check=True, cwd=root_dir)
+                    # Search for the files under shopping_dataset and move them to root
+                    shopping_dir = os.path.join(root_dir, "shopping_dataset")
+                    for dirpath, _, filenames in os.walk(shopping_dir):
+                        for fname in filenames:
+                            if fname in {"product.index", "image_paths.json"}:
+                                src = os.path.join(dirpath, fname)
+                                dst = os.path.join(root_dir, fname)
+                                try:
+                                    os.replace(src, dst)
+                                    print(f"[startup] Moved {fname} into app root")
+                                except Exception:
+                                    pass
+                except Exception as e:
+                    print(f"[startup] Failed to download product index assets: {e}")
+            else:
+                print("[startup] Kaggle product index script not found; skipping product.index download")
+
+        if not have_kaggle:
+            print("[startup] Kaggle env vars not present; skipping all downloads")
     except Exception as _:
         # Non-fatal; app should still run
         print("[startup] Kaggle download failed (non-fatal)")

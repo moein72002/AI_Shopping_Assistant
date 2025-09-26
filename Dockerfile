@@ -42,6 +42,10 @@ RUN uv pip install --system pytest requests python-dotenv && pytest tests/test_a
 # COPY vector_index_names.faiss ./vector_index_names.faiss
 # COPY vector_index_names.faiss.json ./vector_index_names.faiss.json
 
+# Optional: uncomment if product image index assets are present in your workspace
+# COPY product.index ./product.index
+# COPY image_paths.json ./image_paths.json
+
 ENV PORT=8080
 EXPOSE 8080
 

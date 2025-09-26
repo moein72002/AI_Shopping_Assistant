@@ -62,5 +62,8 @@ This simulates the case where the name and other information of the shop are giv
 -----------------------------------
 Scenario 5:
 
-comparison_extract_products should be modified in a way that it can extract two or more names from the query (now it extracts exactly two products, but there may be more than two products). In addition, comparison_extract_products should consider that if a product ID (6 lowercase letters) is given (next to its name) inside the user query, it should only return the product ID instead of its name. Then, only that product (the product whose ID is in the query) will skip bm25_search.
-Based on the fact that in scenario 5, there may be more than two products, compare_two_products should be modified to handle more than two products.
+comparison_extract_products should consider that if a product ID (6 lowercase letters) is given (next to its name) inside the user query, it should only return the product ID instead of its name. Then, only that product (the product whose ID is in the query) will skip bm25_search.
+In scenario 5, compare_two_products should also a method like _generate_sql_for_sellers to generate sql query based on the request. Then, this generated sql query should be run for each of the products in the comparison and the results of this sql query should be give to the LLM agent to generate the final response and determining the winner product.
+
+<!-- comparison_extract_products should be modified in a way that it can extract two or more names from the query (now it extracts exactly two products, but there may be more than two products). In addition, 
+Based on the fact that in scenario 5, there may be more than two products, compare_two_products should be modified to handle more than two products. -->

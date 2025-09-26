@@ -31,6 +31,10 @@
 !vector_index_names.faiss
 !vector_index_names.faiss.json
 
+# Optional product image index assets
+!product.index
+!image_paths.json
+
 # Git
 .git
 .gitignore
