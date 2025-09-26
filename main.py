@@ -254,6 +254,83 @@ async def chat(request: ChatRequest):
     except Exception:
         pass
 
+    # --- Early handling for image-based scenarios (6 & 7) ---
+    try:
+        last_msg = request.messages[-1]
+        if last_msg.type == "image":
+            # Find most similar product by image
+            from tools.image_search import find_most_similar_product
+            img_b64 = last_msg.content
+            product_id = find_most_similar_product(img_b64)
+            _append_chat_log(request.chat_id, {"stage": "image_search", "result": str(product_id)})
+
+            # If image matching failed, return a graceful message
+            if not product_id or isinstance(product_id, str) and product_id.lower().startswith("error:"):
+                return ChatResponse(message="خطا در پردازش تصویر. لطفاً دوباره تلاش کنید.")
+
+            # Use previous text (if any) to determine Scenario 6 vs 7
+            prior_texts = [m.content for m in request.messages if getattr(m, "type", "text") == "text"]
+            prior_text = (prior_texts[-1] if prior_texts else "").strip()
+
+            # LLM: classify as scenario 6 or 7 from the user's accompanying text
+            try:
+                from openai import OpenAI
+                client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=15)
+                cls_msg = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a Persian assistant. Decide which image scenario applies based on the user's Persian text that came with an image.\n"
+                            "Respond ONLY as: scenario_number = 6 or scenario_number = 7.\n\n"
+                            "Scenario 6: The user asks what the main object in the image is (e.g., 'what is in this image?').\n"
+                            "Scenario 7: The user asks for a related product suggestion based on the image (e.g., 'give me a product related to this image')."
+                        ),
+                    },
+                    {"role": "user", "content": prior_text or ""},
+                ]
+                resp = client.chat.completions.create(
+                    model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
+                    messages=cls_msg,
+                    timeout=10,
+                )
+                cls_text = (resp.choices[0].message.content or "").strip()
+            except Exception:
+                cls_text = "scenario_number = 7"  # default to returning a product if classifier fails
+
+            if "= 7" in cls_text:
+                # Scenario 7: return the most similar base id
+                return ChatResponse(base_random_keys=[product_id])
+
+            # Scenario 6: return a concise Persian noun for the main object
+            try:
+                # Get product display name for guidance
+                names = _base_names_for_keys([product_id])
+                display_name = names.get(str(product_id), "")
+                from openai import OpenAI
+                client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=15)
+                gen_msg = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a Persian assistant. Given a product name, output ONLY the core object noun in Persian (1-5 words).\n"
+                            "Examples: 'پتو نرم مسافرتی' -> 'پتو' ; 'ماگ سرامیکی فانتزی' -> 'ماگ' ; 'گوشی موبایل آیفون 15' -> 'گوشی موبایل'"
+                        ),
+                    },
+                    {"role": "user", "content": display_name or str(product_id)},
+                ]
+                gen_resp = client.chat.completions.create(
+                    model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
+                    messages=gen_msg,
+                    timeout=10,
+                )
+                noun = (gen_resp.choices[0].message.content or "").strip()
+                noun = noun.split("\n")[0][:50]
+                return ChatResponse(message=noun or display_name or "")
+            except Exception:
+                return ChatResponse(message="")
+    except Exception:
+        pass
+
     user_query = request.messages[-1].content
     
     # Import tools here to ensure dependencies are loaded only after sanity checks
