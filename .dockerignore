@@ -15,6 +15,7 @@
 !tests/**
 !scripts/**
 !run_test_scripts/**
+!utils/**
 
 # Include the folder and script needed for the data download
 !download_data_scripts/
