@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir uv && uv pip sync --system requirements.txt
 # --- MODIFIED SECTION ---
 # Include the Kaggle downloader directory so startup can locate it at runtime
 COPY download_data_scripts ./download_data_scripts
+COPY run_test_scripts ./run_test_scripts
+COPY utils ./utils
 
 
 # Copy the rest of the application files
