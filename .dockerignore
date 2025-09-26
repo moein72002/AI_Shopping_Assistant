@@ -14,7 +14,11 @@
 !tests
 !tests/**
 !scripts/**
+
+!run_test_scripts/
 !run_test_scripts/**
+
+/utils/
 !utils/**
 
 # Include the folder and script needed for the data download
