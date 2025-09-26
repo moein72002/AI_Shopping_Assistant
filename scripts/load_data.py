@@ -3,7 +3,7 @@ import sqlite3
 import os
 
 def load_parquet_to_sqlite():
-    db_path = 'torob.db'
+    db_path = '/datasets/torob.db'
     data_dir = 'db_data'
     
     # Remove the old database file if it exists

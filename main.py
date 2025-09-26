@@ -168,10 +168,10 @@ async def admin_page():
 async def maybe_download_kaggle_dataset():
     """Ensure required Kaggle artifacts exist in project root: torob.db, products.index, image_paths.json."""
     try:
-        root_dir = os.path.dirname(os.path.abspath(__file__))
-        db_path = os.path.join(root_dir, "torob.db")
-        product_index_path = os.path.join(root_dir, "products.index")
-        image_paths_path = os.path.join(root_dir, "image_paths.json")
+        datasets_dir = os.path.dirname("/datasets/")
+        db_path = os.path.join(datasets_dir, "torob.db")
+        product_index_path = os.path.join(datasets_dir, "products.index")
+        image_paths_path = os.path.join(datasets_dir, "image_paths.json")
 
         force = os.environ.get("FORCE_KAGGLE_DOWNLOAD") == "1"
         have_kaggle = bool(os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"))
@@ -239,6 +239,7 @@ async def maybe_download_kaggle_dataset():
 async def chat(request: ChatRequest):
     chat_id = request.chat_id
     _reset_chat_log(request.chat_id)
+    _append_chat_log(request.chat_id, {"stage": "chat_start", "request": request})
     
     # Scenario 0: Content-based health checks (chat_id can be random)
     try:
@@ -262,12 +263,11 @@ async def chat(request: ChatRequest):
     # --- Early handling for image-based scenarios (6 & 7) ---
     try:
         last_msg = request.messages[-1]
-        _append_chat_log(request.chat_id, {"stage": "image_search_start", "first_message_type": request.messages[0].type, "first_message_content": request.messages[0].content, "type": last_msg.type})
         if last_msg.type == "image":
-            _append_chat_log(request.chat_id, {"stage": "image_search_start_2", "type": last_msg.type})
+            _append_chat_log(request.chat_id, {"stage": "image_search_start_1", "type": last_msg.type})
             # Find most similar product by image
             img_b64 = last_msg.content
-            _append_chat_log(request.chat_id, {"stage": "image_search_start_3"})
+            _append_chat_log(request.chat_id, {"stage": "image_search_start_2"})
             product_id = find_most_similar_product(request.chat_id, img_b64)
             _append_chat_log(request.chat_id, {"stage": "image_search", "result": str(product_id)})
 

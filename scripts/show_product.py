@@ -7,8 +7,8 @@ from typing import Any, List, Tuple
 
 
 def detect_db_path() -> str:
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(root, "torob.db")
+    datasets_path = os.path.dirname("/datasets/")
+    return os.path.join(datasets_path, "torob.db")
 
 
 def get_columns(cur: sqlite3.Cursor, table: str) -> List[str]:

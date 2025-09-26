@@ -17,7 +17,7 @@ load_dotenv()
 
 # --- Constants ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DB_PATH = os.path.join("/datasets/", "torob.db")
 PROGRESS_PATH = os.path.join(PROJECT_ROOT, "index_build_progress.json")
 STATUS_PATH = os.path.join(PROJECT_ROOT, "index_build_status.json")
 GLOBAL_KEYS_PATH = os.path.join(PROJECT_ROOT, "base_random_keys.json")

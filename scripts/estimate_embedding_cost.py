@@ -2,8 +2,8 @@ import os
 import sqlite3
 import math
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DATASET_PATH = os.path.abspath("/datasets/")
+DB_PATH = os.path.join(DATASET_PATH, "torob.db")
 
 # Pricing assumptions (USD)
 PRICE_PER_M_TOKEN = 0.02  # text-embedding-3-small

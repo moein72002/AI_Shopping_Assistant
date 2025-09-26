@@ -5,8 +5,7 @@ import re
 from typing import Optional
 import json
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DB_PATH = os.path.join("/datasets/", "torob.db")
 # get_product_by_code removed per new design
 
 # Mapping for common Persian feature names to English keys in the JSON

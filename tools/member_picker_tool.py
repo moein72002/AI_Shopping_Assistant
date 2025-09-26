@@ -3,8 +3,7 @@ import sqlite3
 from typing import Optional, Tuple
 
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DB_PATH = os.path.join("/datasets/", "torob.db")
 
 
 def pick_best_member_for_base(base_random_key: str) -> Optional[str]:

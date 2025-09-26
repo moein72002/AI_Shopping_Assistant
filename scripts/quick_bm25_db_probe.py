@@ -20,7 +20,7 @@ def pick_sample_query(db_path: str) -> str:
 def main():
     os.environ.setdefault("BM25_LIMIT_DOCS", os.environ.get("LIMIT", "15000"))
     os.environ.setdefault("BM25_DEBUG", "1")
-    q = os.environ.get("Q") or pick_sample_query(os.path.join(os.path.dirname(os.path.dirname(__file__)), "torob.db"))
+    q = os.environ.get("Q") or pick_sample_query("/datasets/", "torob.db"))
     print("Query:", q[:200])
     res = bm25_search(q, k=5)
     print("BM25 result:", res)

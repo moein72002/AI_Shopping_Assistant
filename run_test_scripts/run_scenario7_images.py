@@ -37,7 +37,8 @@ def post_chat(base_url: str, payload: Dict[str, Any], timeout: int = 30) -> Dict
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run Scenario 7 image-based requests")
-    parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8080"), help="Service base URL")
+    # parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8080"), help="Service base URL")
+    parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "https://moein-ai-shopping-assistant.darkube.app"), help="Service base URL")
     parser.add_argument("--file", default=os.path.join("server_tests", "scenario7.json"), help="Path to scenario7.json")
     parser.add_argument("--limit", type=int, default=0, help="Limit number of items (0 = all)")
     parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds")

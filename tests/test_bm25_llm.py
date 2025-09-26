@@ -64,7 +64,7 @@ def _parse_expected_bases(response_field: str):
 @requires_openai
 def test_bm25_llm_on_scenarios_subset(server):
     # Ensure DB exists with expected table
-    conn = sqlite3.connect(os.path.join(PROJECT_ROOT, "torob.db"))
+    conn = sqlite3.connect(os.path.join("/datasets/", "torob.db"))
     cur = conn.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='base_products'")
     assert cur.fetchone() is not None, "torob.db missing base_products table"

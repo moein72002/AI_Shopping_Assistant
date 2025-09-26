@@ -27,10 +27,10 @@ def _fetch_names(db_path: str, keys: List[str]) -> Dict[str, str]:
 
 
 def main():
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(project_root)
-    req_path = os.path.join(project_root, "server_tests", "scenarios_1_to_5_requests.json")
-    db_path = os.path.join(project_root, "torob.db")
+    datasets_path = os.path.dirname("/datasets/")
+    datasets_path = os.path.dirname(datasets_path)
+    req_path = os.path.join(datasets_path, "server_tests", "scenarios_1_to_5_requests.json")
+    db_path = os.path.join(datasets_path, "torob.db")
     with open(req_path, "r", encoding="utf-8") as f:
         items = json.load(f)
 

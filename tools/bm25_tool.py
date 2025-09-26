@@ -72,7 +72,7 @@ def _ensure_searcher() -> BM25ProductSearcher:
         except ValueError:
             limit_val = None
 
-        ids, texts = load_products("torob.db", limit=limit_val)
+        ids, texts = load_products("/datasets/torob.db", limit=limit_val)
         if len(ids) == 0:
             raise RuntimeError("No products loaded from database.")
         _GLOBAL_SEARCHER = BM25ProductSearcher(ids, texts)
@@ -90,7 +90,7 @@ def bm25_search(chat_id: str, query: str, k: int = 5) -> List[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="BM25S search over base_products names")
-    parser.add_argument("--db", default="torob.db", help="Path to SQLite database file")
+    parser.add_argument("--db", default="/datasets/torob.db", help="Path to SQLite database file")
     parser.add_argument("--query", required=True, help="Search query (Persian or English)")
     parser.add_argument("--k", type=int, default=5, help="Top-K products to return (default: 5)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of rows to index (for quick tests)")

@@ -44,7 +44,7 @@ def _base_names_for_keys(keys: _List[str]) -> Dict[str, str]:
     if not keys:
         return {}
 
-    db_path = os.path.join(os.path.dirname(__file__), "..", "torob.db")
+    db_path = os.path.join("/datasets/", "torob.db")
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:

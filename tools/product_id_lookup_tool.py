@@ -4,8 +4,7 @@ import sqlite3
 from typing import Optional
 
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DB_PATH = os.path.join("/datasets/", "torob.db")
 
 
 def extract_product_id(query: str) -> Optional[str]:

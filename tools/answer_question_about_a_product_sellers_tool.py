@@ -5,8 +5,8 @@ import json
 from utils.utils import _append_chat_log
 from tools.database_tool import get_db_schema
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DATASETS_PATH = os.path.abspath("/datasets/")
+DB_PATH = os.path.join(DATASETS_PATH, "torob.db")
 
 
 def _aggregate_seller_facts(cur: sqlite3.Cursor, product_id: str) -> Dict[str, Any]:

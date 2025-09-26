@@ -4,9 +4,8 @@ import sys
 
 
 def get_database_path() -> str:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(current_dir)
-    return os.path.join(project_root, "torob.db")
+    datasets_path = os.path.dirname("/datasets/")
+    return os.path.join(datasets_path, "torob.db")
 
 
 def count_non_empty_english_name(database_path: str) -> int:

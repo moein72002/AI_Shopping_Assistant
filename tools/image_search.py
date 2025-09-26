@@ -18,9 +18,9 @@ MODEL_ID = "openai/clip-vit-large-patch14"
 # Updated directory paths to include all 7 parts
 IMAGE_DIRS = [f"/kaggle/input/images-part{i}/images_part{i}" for i in range(1, 8)]
 TEST_IMAGE_DIR = "/kaggle/input/test-images/test_images"
-FAISS_INDEX_PATH = "products.index"
+FAISS_INDEX_PATH = "/datasets/products.index"
 # The map now stores full image paths, not just IDs
-IMAGE_PATH_MAP_PATH = "image_paths.json"
+IMAGE_PATH_MAP_PATH = "/datasets/image_paths.json"
 # Adjust batch size based on your GPU's VRAM.
 BATCH_SIZE = 64
 

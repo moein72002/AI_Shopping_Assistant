@@ -92,7 +92,7 @@ def test_scenario_1_product_search_correctness(server):
     which does not require an LLM call.
     """
     product_name_query = "دراور چهار کشو (کد D14)"
-    conn = sqlite3.connect("torob.db")
+    conn = sqlite3.connect("/datasets/torob.db")
     cur = conn.cursor()
     cur.execute("SELECT random_key FROM base_products WHERE persian_name LIKE ?", (f"%{product_name_query}%",))
     result = cur.fetchone()
@@ -124,7 +124,7 @@ def test_scenario_2_product_feature_correctness(server):
     status from the OpenAI API if credits have run out.
     """
     product_name_query = "پارچه تریکو جودون 1/30 لاکرا گردباف نوریس"
-    conn = sqlite3.connect("torob.db")
+    conn = sqlite3.connect("/datasets/torob.db")
     cur = conn.cursor()
     cur.execute("SELECT extra_features FROM base_products WHERE persian_name LIKE ?", (f"%{product_name_query}%",))
     result = cur.fetchone()

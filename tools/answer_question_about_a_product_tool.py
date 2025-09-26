@@ -5,8 +5,7 @@ from typing import Dict, Optional
 from utils.utils import _append_chat_log
 
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DB_PATH = os.path.join("/datasets/", "torob.db")
 
 
 def _fetch_base(cur: sqlite3.Cursor, base_id: str) -> Optional[Dict]:

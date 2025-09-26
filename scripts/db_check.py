@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'torob.db')
+DB_PATH = os.path.join("/datasets/", 'torob.db')
 print('DB:', DB_PATH, 'exists:', os.path.exists(DB_PATH))
 conn = sqlite3.connect(DB_PATH)
 c = conn.cursor()

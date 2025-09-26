@@ -8,7 +8,7 @@ _index_cache = {}
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INDEX_PATH = os.path.join(PROJECT_ROOT, "vector_index.faiss")
 NAMES_INDEX_PATH = os.path.join(PROJECT_ROOT, "vector_index_names.faiss")
-DB_PATH = os.path.join(PROJECT_ROOT, "torob.db")
+DB_PATH = os.path.join("/datasets/", "torob.db")
 
 # The global mapping file is now gone, so these paths point to the specific mappings
 FULL_MAPPING_PATH = os.path.join(PROJECT_ROOT, "vector_index.faiss.json")
