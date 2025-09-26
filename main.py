@@ -15,6 +15,7 @@ import logging
 import subprocess
 import sys
 from tools.image_search import find_most_similar_product, warm_up_image_search
+from tools.bm25_tool import bm25_search
 
 # --- Logging Setup ---
 # Create a logger
@@ -234,6 +235,12 @@ async def maybe_download_kaggle_dataset():
         _append_chat_log("startup", {"stage": "warm_up_image_search"})
         warm_up_product_id = warm_up_image_search()
         print(f"[startup] Warm up image search: {warm_up_product_id}")
+
+        _append_chat_log("startup", {"stage": "warm_up_bm25"})
+        bm25_warmup_query = "رولت خوری دست ساز سرامیکی رودخانه"
+        results = bm25_search("startup", bm25_warmup_query, k=5)
+        print(f"[startup] Warm up bm25: bm25_warmup_query: {bm25_warmup_query}, results: {results}, names: {_base_names_for_keys(results)}")
+
     except Exception as _:
         # Non-fatal; app should still run
         print("[startup] Kaggle download failed (non-fatal)")
@@ -350,7 +357,6 @@ async def chat(request: ChatRequest):
         get_min_price_by_product_name,
         get_min_price_by_product_id,
     )
-    from tools.bm25_tool import bm25_search
     from tools.comparison_extractor_tool import comparison_extract_products
     from tools.product_name_extractor_tool import extract_product_name
     from tools.product_id_lookup_tool import extract_product_id
