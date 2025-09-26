@@ -81,6 +81,7 @@ async def log_requests(request: Request, call_next):
 
 # --- Simple in-memory state (sliding window) ---
 chat_histories: Dict[str, _List[dict]] = {}
+scenario4_sessions: Dict[str, dict] = {}
 
 class Message(BaseModel):
     type: str
@@ -405,6 +406,7 @@ The user wants to **find a product related to the image**. The query is about ge
     from tools.answer_question_about_a_product_sellers_tool import answer_question_about_a_product_sellers
     from tools.ask_clarifying_questions_tool import ask_clarifying_questions
     from tools.member_picker_tool import pick_best_member_for_base
+    from tools.shop_preference_extractor_tool import extract_shop_preferences
 
     # No precheck heuristics; rely on router tool-calling entirely
 
@@ -430,6 +432,69 @@ The user wants to **find a product related to the image**. The query is about ge
             return ChatResponse(base_random_keys=results)
         except Exception:
             pass
+
+    # --- If Scenario 4 session is active, continue without re-classifying ---
+    if (request.chat_id in scenario4_sessions) and scenario4_sessions[request.chat_id].get("active"):
+        try:
+            sess = scenario4_sessions[request.chat_id]
+            step = int(sess.get("step", 0))
+            # Update product name using accumulated user messages
+            all_user_text = "\n".join(m.get("content", "") for m in chat_histories[request.chat_id] if m.get("role") == "user")
+            name = extract_product_name(request.chat_id, all_user_text or user_query or "")
+            query_for_bm25 = (name or user_query or "").strip()
+            cands50 = bm25_search(request.chat_id, query_for_bm25, k=50) or []
+            names_map = _base_names_for_keys(cands50)
+            cand_names = [names_map.get(str(rk), str(rk)) for rk in cands50]
+
+            if step <= 2:
+                q = ask_clarifying_questions(user_query, candidate_names=cand_names, force_shop_question=False)
+                chat_histories[request.chat_id].append({"role": "assistant", "content": q})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                sess.update({"step": step + 1, "last_name": name, "last_candidates": cands50})
+                scenario4_sessions[request.chat_id] = sess
+                _append_chat_log(request.chat_id, {"stage": "scenario4_clarify_active", "step": step, "q": q})
+                return ChatResponse(message=q)
+
+            if step == 3:
+                q = ask_clarifying_questions(user_query, candidate_names=cand_names, force_shop_question=True)
+                chat_histories[request.chat_id].append({"role": "assistant", "content": q})
+                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                sess.update({"step": step + 1, "last_name": name, "last_candidates": cands50})
+                scenario4_sessions[request.chat_id] = sess
+                _append_chat_log(request.chat_id, {"stage": "scenario4_shop_question", "q": q})
+                return ChatResponse(message=q)
+
+            # Finalize: select member using user constraints
+            prefs = extract_shop_preferences(request.chat_id, all_user_text or user_query or "")
+            selected_base = (cands50[0] if cands50 else None)
+            if not selected_base:
+                cands20 = bm25_search(request.chat_id, query_for_bm25, k=20) or []
+                selected_base = cands20[0] if cands20 else None
+            if selected_base:
+                best_member = pick_best_member_for_base(
+                    selected_base,
+                    max_price=prefs.get("max_price"),
+                    require_warranty=prefs.get("require_warranty"),
+                    min_shop_score=prefs.get("min_shop_score"),
+                    preferred_shop_id=prefs.get("preferred_shop_id"),
+                    user_context=all_user_text or user_query or "",
+                )
+                if not best_member:
+                    best_member = pick_best_member_for_base(selected_base)
+                # End session when we return member_random_keys
+                scenario4_sessions.pop(request.chat_id, None)
+                return ChatResponse(member_random_keys=[best_member] if best_member else None)
+
+            # If no base could be selected, ask another targeted shop question
+            q = ask_clarifying_questions(user_query, candidate_names=cand_names, force_shop_question=True)
+            chat_histories[request.chat_id].append({"role": "assistant", "content": q})
+            chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+            sess.update({"step": step + 1, "last_name": name, "last_candidates": cands50})
+            scenario4_sessions[request.chat_id] = sess
+            return ChatResponse(message=q)
+        except Exception as e:
+            _append_chat_log(request.chat_id, {"stage": "scenario4_active_error", "error": str(e)})
+            # graceful fallback to classification path below
 
     # --- LLM: Classify scenario first ---
     from openai import OpenAI
@@ -551,47 +616,32 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 return ChatResponse(message=ans)
 
             if scenario_num == 4:
-                _append_chat_log(request.chat_id, {"stage": "scenario4_start", "remaining_turns": remaining_turns, "user_query": user_query})
-                # Scenario 4: conversational narrowing, then return member_random_key
-                if remaining_turns <= 1:
+                _append_chat_log(request.chat_id, {"stage": "scenario4_init", "user_query": user_query})
+                # Initialize Scenario 4 session state and ask first clarifying question with top-50 candidates
+                try:
                     name = extract_product_name(request.chat_id, user_query or "")
-                    # Last turn: pick a best candidate from the latest user text
-                    cands = bm25_search(request.chat_id, name or "", k=20) or []
-                    _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
-                    if cands:
-                        best_member = pick_best_member_for_base(cands[0])
-                        if best_member:
-                            return ChatResponse(member_random_keys=[best_member])
-                    # Fallback no candidates: ask one final question
-                    q = ask_clarifying_questions(user_query)
+                    query_for_bm25 = (name or user_query or "").strip()
+                    cands50 = bm25_search(request.chat_id, query_for_bm25, k=50) or []
+                    names_map = _base_names_for_keys(cands50)
+                    cand_names = [names_map.get(str(rk), str(rk)) for rk in cands50]
+
+                    q = ask_clarifying_questions(user_query, candidate_names=cand_names, force_shop_question=False)
                     chat_histories[request.chat_id].append({"role": "assistant", "content": q})
                     chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
+                    scenario4_sessions[request.chat_id] = {
+                        "active": True,
+                        "step": 1,  # first clarifying question asked
+                        "last_name": name,
+                        "last_candidates": cands50,
+                    }
                     return ChatResponse(message=q)
-
-                # Not final turn: ask a clarifying question first if this is the first assistant turn
-                if remaining_turns == 4:
-                    name = extract_product_name(request.chat_id, user_query or "")
-                    # Last turn: pick a best candidate from the latest user text
-                    cands = bm25_search(request.chat_id, name or "", k=50) or []
-
-                    q = ask_clarifying_questions(user_query)
+                except Exception as _e:
+                    # Fallback: still start a session and ask a generic clarifying question
+                    q = ask_clarifying_questions(user_query, candidate_names=None, force_shop_question=False)
                     chat_histories[request.chat_id].append({"role": "assistant", "content": q})
                     chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
-                    _append_chat_log(request.chat_id, {"stage": "scenario4_clarify", "q": q})
+                    scenario4_sessions[request.chat_id] = {"active": True, "step": 1}
                     return ChatResponse(message=q)
-
-                # Subsequent turns: try searching based on latest constraints and pick a member
-                cands = bm25_search(request.chat_id, user_query.strip(), k=5) or []
-                _append_chat_log(request.chat_id, {"stage": "scenario4_candidates", "cands": cands[:5]})
-                if cands:
-                    best_member = pick_best_member_for_base(cands[0])
-                    if best_member:
-                        return ChatResponse(member_random_keys=[best_member])
-                # If still nothing, ask another clarifying question
-                q = ask_clarifying_questions(user_query)
-                chat_histories[request.chat_id].append({"role": "assistant", "content": q})
-                chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
-                return ChatResponse(message=q)
 
             if scenario_num == 5:
                 # Scenario 5: extract products -> bm25 -> compare -> return winner id and reason

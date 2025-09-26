@@ -52,21 +52,19 @@ In scenarios 2 and 3 there shouldn't be any clarification questions and we shoul
 -----------------------------
 Scenario 4:
 
-Use tfidf for distinguishing products?
+<!-- Use tfidf for distinguishing products? -->
 
-When second and ... requests come they should continue their flow in scenario 4 flow.
+When second and ... requests come they should continue their flow in scenario 4 flow (they should skip scenario_number finding part).
 
-In some requests the user wants a product, but they don't know the exact product. They want help to find the desired product with some constraints that they usually put in their request. The LLM agent should help the user find a product based on constraints by asking some clarifying questions. Maybe it would be good to search and gather some products that meet the initial constraints and then start to ask some clarifying questions based on features and price of those products. I think it would be good to create a find_product_that_needs_clarification tool. This tool
+In scenario 4 in first 3 clarifying questions find 50 most similar products using bm25_search (after finding name of the product using extract_product_name). Give the 50 most similar products to the LLM agent and ask to ask more clarifying questions. Name of the product should be updated based on user answers in before passing to bm25_search. We can create a new tool that updates product name based on answer's of the user to the clarifying questions or just pass all the user requests to the extract_product_name. The 4th question should be specifically related to the shop to find member_random_keys (we assume that before asking this question we found the base product). In the last turn we should tell the LLM the to select a product product and in the last response we should return the member_random_keys as mentioned in task_description.
 
-Scenario 4 should enter a loop and tell LLM the current step to make sure to know the remaining turns. I think it is always better to return the response after the fifth user request, because we can gain more info about the requested product. Therefore, we can make sure that we have found the correct product.
+pick_best_member_for_base shouldn't always return the member with the lowest price. Instead, it should ask about the price and the seller's attributes (e.g. has_warranty) and check all user constraints to find the shop that the user want to buy the product from. In the end, the output of our service should be member_random_keys. Check the description of scenario 4 as well in task_description.mdc.
 
-I have updated the calculation process of remaining_turns. Now remaining_turns is calculated based on the number of user queries in the current chat.
+Regarding scenario 4, it is also possible to check the shop_id with the user. This can be done in the last clarifying question if we already found the product.
 
-pick_best_member_for_base shouldn't always return the member with the lowest price. Instead, it should ask about the price and the seller's attributes (e.g. has_warranty) to find the shop that the user want to buy the product from. In the end, the output of our service should be member_random_keys. Check the description of scenario 4 as well.
+<!-- In some requests the user wants a product, but they don't know the exact product. They want help to find the desired product with some constraints that they usually put in their request. The LLM agent should help the user find a product based on constraints by asking some clarifying questions. It would be good to search and gather some products that meet the initial constraints and then start to ask some clarifying questions based on features and price of those products. -->
 
-Regarding scenario 4, it is also possible to check the shop_id with the user.
-
-This simulates the case where the name and other information of the shop are given to the user, and the user approves or rejects it.
+<!-- Scenario 4 should enter a in a some kind of loop.  I think it is always better to return the response after the fifth user request, because we can gain more info about the requested product. Therefore, we can make sure that we have found the correct product. -->
 -----------------------------------
 Scenario 5:
 
