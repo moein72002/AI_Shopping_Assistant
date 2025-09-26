@@ -297,11 +297,51 @@ async def chat(request: ChatRequest):
                     {
                         "role": "system",
                         "content": (
-                            "You are a Persian assistant. Decide which image scenario applies based on the user's Persian text that came with an image.\n"
-                            "Respond ONLY as: scenario_number = 6 or scenario_number = 7.\n\n"
-                            "Scenario 6: The user asks what the main object in the image is (e.g., 'what is in this image?').\n"
-                            "Scenario 7: The user asks for a related product suggestion based on the image (e.g., 'give me a product related to this image')."
-                        ),
+                            """
+You are an expert AI classifier. Your task is to analyze a user's **Persian text query**, which accompanies an image, and determine the user's intent by categorizing it into one of two scenarios.
+
+---
+
+## Scenarios
+
+Carefully evaluate the user's Persian text to determine which of the following scenarios is the best fit.
+
+### **Scenario 6: Object Identification**
+
+The user wants to know **what the main object or concept in the image is**. The query is about simple identification.
+
+**Common Persian phrases for this scenario include:**
+* "شیء و مفهوم اصلی در تصویر چیست؟" (What is the main object and concept in the image?)
+* "این عکس چیه؟" (What is this picture?)
+* "توی تصویر چی میبینم؟" (What do I see in the picture?)
+* "این چیه؟" (What is this?)
+
+**Example Input (Text):** "شیء و مفهوم اصلی در تصویر چیست؟"
+**Correct Classification:** `scenario_number = 6`
+
+***
+
+### **Scenario 7: Product Recommendation**
+
+The user wants to **find a product related to the image**. The query is about getting a product suggestion, finding a similar item, or asking for a purchase link.
+
+**Common Persian phrases for this scenario include:**
+* "یک محصول مرتبط مناسب با تصویر به من بدهید." (Give me a suitable product related to the image.)
+* "محصول مشابه این عکس رو بهم پیشنهاد بده." (Suggest a product similar to this picture.)
+* "از اینا کجا میفروشن؟" (Where do they sell these?)
+* "لینک خرید اینو میخوام." (I want the purchase link for this.)
+
+**Example Input (Text):** "یک محصول مرتبط مناسب با تصویر به من بدهید."
+**Correct Classification:** `scenario_number = 7`
+
+---
+
+## Output Instructions
+
+* Your response **MUST ONLY** be `scenario_number = 6` or `scenario_number = 7`.
+* **DO NOT** include any other text, explanations, or conversational filler.
+                            """
+                            ),
                     },
                     {"role": "user", "content": prior_text or ""},
                 ]
