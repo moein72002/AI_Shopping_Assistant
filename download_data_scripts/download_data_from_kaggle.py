@@ -38,7 +38,7 @@ print("Authentication successful.")
 
 # --- Configuration ---
 dataset_slug = 'moeinmadadi/ai-shopping-assistant-db'
-download_path = './shopping_dataset'
+download_path = '/datasets/'
 os.makedirs(download_path, exist_ok=True)
 
 # --- Download and Unzip ---

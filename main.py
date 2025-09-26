@@ -188,13 +188,15 @@ async def maybe_download_kaggle_dataset():
                 try:
                     print("[startup] Downloading torob.db from Kaggle...")
                     subprocess.run([sys.executable, script_path], check=True, cwd=root_dir)
-                    produced = os.path.join(root_dir, "shopping_dataset", "torob.db")
+                    produced = os.path.join("/datasets/", "torob.db")
                     if os.path.exists(produced):
-                        try:
-                            os.replace(produced, db_path)
-                            print("[startup] Moved torob.db into app root")
-                        except Exception:
-                            pass
+                        print("[startup] torob.db downloaded successfully")
+                    # if os.path.exists(produced):
+                    #     try:
+                    #         os.replace(produced, db_path)
+                    #         print("[startup] Moved torob.db into app root")
+                    #     except Exception:
+                    #         pass
                 except Exception as e:
                     print(f"[startup] Failed to download torob.db: {e}")
             else:
@@ -208,18 +210,19 @@ async def maybe_download_kaggle_dataset():
                 try:
                     print("[startup] Downloading product index assets from Kaggle...")
                     subprocess.run([sys.executable, script2_path], check=True, cwd=root_dir)
-                    # Search for the files under shopping_dataset and move them to root
-                    shopping_dir = os.path.join(root_dir, "shopping_dataset")
-                    for dirpath, _, filenames in os.walk(shopping_dir):
-                        for fname in filenames:
-                            if fname in {"products.index", "image_paths.json"}:
-                                src = os.path.join(dirpath, fname)
-                                dst = os.path.join(root_dir, fname)
-                                try:
-                                    os.replace(src, dst)
-                                    print(f"[startup] Moved {fname} into app root")
-                                except Exception:
-                                    pass
+                    print("[startup] product index assets downloaded successfully")
+                    # # Search for the files under /datasets/ and move them to root
+                    # shopping_dir = os.path.join("/datasets/")
+                    # for dirpath, _, filenames in os.walk(shopping_dir):
+                    #     for fname in filenames:
+                    #         if fname in {"products.index", "image_paths.json"}:
+                    #             src = os.path.join(dirpath, fname)
+                    #             dst = os.path.join(root_dir, fname)
+                    #             try:
+                    #                 os.replace(src, dst)
+                    #                 print(f"[startup] Moved {fname} into app root")
+                    #             except Exception:
+                    #                 pass
                 except Exception as e:
                     print(f"[startup] Failed to download product index assets: {e}")
             else:

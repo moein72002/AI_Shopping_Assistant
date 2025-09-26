@@ -21,6 +21,5 @@ echo "Downloading dataset from Kaggle..."
 python download_data_from_kaggle.py
 
 echo "Moving dataset file..."
-mv ./shopping_dataset/torob.db ./torob.db
 
 echo "Dataset downloaded successfully! ✨"
