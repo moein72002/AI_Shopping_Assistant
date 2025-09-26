@@ -83,7 +83,6 @@ def bm25_search(chat_id: str, query: str, k: int = 5) -> List[str]:
     """Return the `random_key` values of the top 5 products for the given query."""
     searcher = _ensure_searcher()
     results = searcher.top_k_ids(query, k=k)
-    print(f"results: {results}")
     name_map = _base_names_for_keys(results or [])
     _append_chat_log(chat_id, {"stage": "tool_result", "results": results[:10] if results else [], "names": name_map})
     return results
@@ -103,7 +102,6 @@ def main() -> None:
 
     searcher = BM25ProductSearcher(ids, texts)
     top_ids = searcher.top_k_ids(args.query, k=args.k)
-    print({"query": args.query, "top_ids": top_ids})
 
 
 if __name__ == "__main__":

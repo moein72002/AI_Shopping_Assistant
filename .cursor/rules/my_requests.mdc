@@ -17,6 +17,10 @@ Improve tools description so that the LLM can more intelligently select tools.
 
 Run tests in .\run_test_scripts\run_scenarios_sample.py in paralel to boost speed. Add number of worker arg inside the script.
 
+decrease size of extract_product_name to make it faster.
+
+* set timeout not to continue with previous request.
+
 ------------------------------
 Scenario 1:
 + add a LLM agent call and give top result of bm25_search to find the correct product between them.

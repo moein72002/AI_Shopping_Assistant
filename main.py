@@ -338,7 +338,6 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
                 """
             ),
         }
-        print(f"Chat ID: {chat_id}")
         model_messages = [cls_system_message] + (history[-10:])
         cls_resp = client.chat.completions.create(
             model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
@@ -346,7 +345,6 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
             timeout=10,
         )
         cls_text = (cls_resp.choices[0].message.content or "").strip()
-        print(f"cls_text: {cls_text}")
         _append_chat_log(request.chat_id, {"stage": "scenario_classification", "raw": cls_text})
         m = re.search(r"scenario_number\s*=\s*(\d)", cls_text)
         if m:
@@ -375,9 +373,11 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
 
             if scenario_num == 3:
                 # Scenario 3: resolve product id -> answer about sellers
+                _append_chat_log(request.chat_id, {"stage": "scenario3_start", "user_query": user_query})
                 pid = _resolve_base_id(user_query)
                 _append_chat_log(request.chat_id, {"stage": "scenario3_resolve", "pid": pid})
                 ans = answer_question_about_a_product_sellers(request.chat_id, product_id=pid, question=user_query)
+                _append_chat_log(request.chat_id, {"stage": "scenario3_answer", "answer": ans})
                 chat_histories[request.chat_id].append({"role": "assistant", "content": str(ans)})
                 chat_histories[request.chat_id] = chat_histories[request.chat_id][-10:]
                 return ChatResponse(message=ans)
