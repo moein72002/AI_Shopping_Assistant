@@ -183,9 +183,9 @@ docker build -t my-app-api-only .
 docker run --rm -p 8080:8080 --env-file .env my-app-api-only
 ```
 
-# 
+# You can test the api using below command
 ```bash
-python scripts/play_chat.py --chat-id "scenario-3-test-5" --message "hello"
+python scripts/play_chat.py --chat-id "scenario-3-test-5" --message "ping"
 ```
 
 The containerized API will be available at `http://localhost:8080`.

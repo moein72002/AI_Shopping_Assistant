@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Install deps with uv (faster, deterministic). Ensure uv is present.
 COPY requirements.txt ./
-RUN pip install --no-cache-dir uv && uv pip sync --system requirements.txt
+RUN pip install uv && uv pip sync --system requirements.txt
 
 # --- MODIFIED SECTION ---
 # Include the Kaggle downloader directory so startup can locate it at runtime
