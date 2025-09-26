@@ -31,8 +31,8 @@ def post_chat(base_url: str, payload: Dict[str, Any], timeout: int = 30) -> Dict
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run 5 random /chat requests from the scenarios file")
-    parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8080"), help="Service base URL (default: http://localhost:8000)")
-    # parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "https://moein-ai-shopping-assistant.darkube.app"), help="Service base URL (default: http://localhost:8000)")
+    # parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8080"), help="Service base URL (default: http://localhost:8000)")
+    parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "https://moein-ai-shopping-assistant.darkube.app"), help="Service base URL (default: http://localhost:8000)")
     parser.add_argument("--file", default=os.path.join("server_tests", "scenario2.json"), help="Path to scenarios JSON file")
     parser.add_argument("--limit", type=int, default=20, help="Number of random samples to run (default: 5)")
     # parser.add_argument("--seed", type=int, default=0, help="Random seed (default: 0)")

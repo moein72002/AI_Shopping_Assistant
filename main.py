@@ -230,7 +230,10 @@ async def maybe_download_kaggle_dataset():
 
         if not have_kaggle:
             print("[startup] Kaggle env vars not present; skipping all downloads")
-        warm_up_image_search()
+
+        _append_chat_log("startup", {"stage": "warm_up_image_search"})
+        warm_up_product_id = warm_up_image_search()
+        print(f"[startup] Warm up image search: {warm_up_product_id}")
     except Exception as _:
         # Non-fatal; app should still run
         print("[startup] Kaggle download failed (non-fatal)")
