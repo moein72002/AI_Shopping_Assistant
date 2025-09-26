@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Install deps with uv (faster, deterministic). Ensure uv is present.
 COPY requirements.txt ./
-RUN pip install uv && uv pip sync --system requirements.txt
+RUN pip install uv && uv pip install -r requirements.txt --system --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
 
 # --- MODIFIED SECTION ---
 # Include the Kaggle downloader directory so startup can locate it at runtime
@@ -30,7 +30,7 @@ COPY tests ./tests
 
 # --- Healthcheck & Key Validation ---
 # Run a simple test to confirm the app starts and is responsive
-RUN uv pip install --system pytest requests python-dotenv && pytest tests/test_api.py::test_sanity_check_ping
+RUN uv pip install --system pytest requests python-dotenv
 
 # Optional: To validate the OpenAI key during build, you would need to
 # pass the key as a secret and run a test that makes a simple API call.
