@@ -213,25 +213,104 @@ This scenario is designed to ensure the judge is correctly connected to the serv
 
 ***
 
-### **Scenario Six**
-**Goal:** The user wants to know what the main object in an image is. There may be several objects in the image, but you must answer based on the product information.
-**Output:** Tell the user the main object or subject in the image.
+**Scenario Six**
 
-| ورودی (Request) | خروجی (Response) |
-| :--- | :--- |
-| `{ "chat_id": "q5-abc", "messages": [ { "type": "text", "content": "شیء و مفهوم اصلی در تصویر چیست؟" }, { "type": "image", "content": "data:image/jpeg;base64,<image-base64>" } ] }` | `{ "message": "صندلی", "base_random_keys": null, "member_random_keys": null }` |
+**Goal:** The user wants to know what the main object in a photo is. There might be several objects in the image, but the response should be based on available product information (offline data).
 
+**Output:** The main object or subject in the photo should be told to the user. A general concept without details is expected. Your output will be checked by an LLM.
 
-* **Activation Date:** September 18th
-* **Points:** 100
+**Note:** The images will definitely map to a base or have a greater similarity to a base. If needed, you can use the information from this product to respond.
 
-***
+**Example 1:** Image link
+*Input (Request)*
 
-### **Scenario Seven**
-**Goal:** The user is looking for the base corresponding to a specific image (the image maps to a specific base).
-**Output:** The base random key should be provided in the output (in the `base_random_keys` section).
-* **Activation Date:** September 18th
-* **Points:** 250
+```json
+{
+  "chat_id": "q5-abc",
+  "messages": [
+    {
+      "type": "text",
+      "content": "شیء و مفهوم اصلی در تصویر چیست؟"
+    },
+    {
+      "type": "image",
+      "content": "data:image/jpeg;base64,<image-base64>"
+    }
+  ]
+}
+```
+
+*Output (Response)*
+
+```json
+{
+  "message": "پتو",
+  "base_random_keys": null,
+  "member_random_keys": null
+}
+```
+
+The images have been encoded as follows:
+
+```python
+import base64
+import requests
+
+def get_base64_encoded_image(image_url: str):
+    response = requests.get(image_url)
+    response.raise_for_status()
+    image_data = response.content
+    base64_image = base64.b64encode(image_data).decode("utf-8")
+    assert base64.b64decode(base64_image) == image_data
+    return base64_image
+```
+
+**Activation date:** 27 Shahrivar
+**Points:** 100
+
+-----
+
+**Scenario Seven**
+
+**Goal:** The user is looking for the base related to a specific photo (the photo maps to a specific base).
+
+**Output:** The random key of the best base should be given in the output. (In the `base_random_keys` section, only one item should be returned.)
+
+**Activation date:** 27 Shahrivar
+
+**Example:**
+*Input (Request)*
+
+```json
+{
+  "chat_id": "q5-abc",
+  "messages": [
+    {
+      "type": "text",
+      "content": "یک محصول مرتبط مناسب با تصویر به من بدهید."
+    },
+    {
+      "type": "image",
+      "content": "data:image/jpeg;base64,<image-base64>"
+    }
+  ]
+}
+```
+
+*Output (Response)*
+
+```json
+{
+  "message": null,
+  "base_random_keys": ["vdbkdf"],
+  "member_random_keys": null
+}
+```
+
+**Sample image:** [Image link]
+
+**Note:** The images will definitely map to a base or have a greater similarity to a base.
+**Points:** 250
 
 ***
 

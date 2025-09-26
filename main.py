@@ -165,11 +165,11 @@ async def admin_page():
 
 @app.on_event("startup")
 async def maybe_download_kaggle_dataset():
-    """Ensure required Kaggle artifacts exist in project root: torob.db, product.index, image_paths.json."""
+    """Ensure required Kaggle artifacts exist in project root: torob.db, products.index, image_paths.json."""
     try:
         root_dir = os.path.dirname(os.path.abspath(__file__))
         db_path = os.path.join(root_dir, "torob.db")
-        product_index_path = os.path.join(root_dir, "product.index")
+        product_index_path = os.path.join(root_dir, "products.index")
         image_paths_path = os.path.join(root_dir, "image_paths.json")
 
         force = os.environ.get("FORCE_KAGGLE_DOWNLOAD") == "1"
@@ -199,7 +199,7 @@ async def maybe_download_kaggle_dataset():
             else:
                 print("[startup] Kaggle DB script not found; skipping torob.db download")
 
-        # --- product.index and image_paths.json (image search index) ---
+        # --- products.index and image_paths.json (image search index) ---
         needs_product_assets = (not os.path.exists(product_index_path) or not os.path.exists(image_paths_path) or force)
         if needs_product_assets and have_kaggle:
             script2_path = os.path.join(root_dir, "download_data_scripts", "download_product_index_from_kaggle.py")
@@ -211,7 +211,7 @@ async def maybe_download_kaggle_dataset():
                     shopping_dir = os.path.join(root_dir, "shopping_dataset")
                     for dirpath, _, filenames in os.walk(shopping_dir):
                         for fname in filenames:
-                            if fname in {"product.index", "image_paths.json"}:
+                            if fname in {"products.index", "image_paths.json"}:
                                 src = os.path.join(dirpath, fname)
                                 dst = os.path.join(root_dir, fname)
                                 try:
@@ -222,7 +222,7 @@ async def maybe_download_kaggle_dataset():
                 except Exception as e:
                     print(f"[startup] Failed to download product index assets: {e}")
             else:
-                print("[startup] Kaggle product index script not found; skipping product.index download")
+                print("[startup] Kaggle product index script not found; skipping products.index download")
 
         if not have_kaggle:
             print("[startup] Kaggle env vars not present; skipping all downloads")
