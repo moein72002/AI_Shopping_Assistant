@@ -377,7 +377,7 @@ The user wants to **find a product related to the image**. The query is about ge
                     {"role": "user", "content": display_name or str(product_id)},
                 ]
                 gen_resp = client.chat.completions.create(
-                    model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
+                    model=os.environ.get("LLM_ROUTER_MODEL", "gpt-4o-mini"),
                     messages=gen_msg,
                     timeout=10,
                 )
@@ -573,7 +573,7 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
         }
         model_messages = [cls_system_message] + (history[-10:])
         cls_resp = client.chat.completions.create(
-            model=os.environ.get("LLM_ROUTER_MODEL", "gpt-5-mini"),
+            model=os.environ.get("LLM_ROUTER_MODEL", "gpt-4o-mini"),
             messages=model_messages,
             timeout=10,
         )
@@ -589,10 +589,73 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
     if scenario_num in {1, 2, 3, 4, 5}:
         try:
             if scenario_num == 1:
-                # Scenario 1: extract product id and return it
-                pid = _resolve_base_id(user_query)
-                _append_chat_log(request.chat_id, {"stage": "scenario1_resolve", "pid": pid})
-                return ChatResponse(base_random_keys=[pid] if pid else None)
+                # Scenario 1: BM25 top-10 + LLM disambiguation over candidates
+                try:
+                    # Fast path: if an id is explicitly present and valid
+                    pid_direct = extract_product_id(user_query or "")
+                    if pid_direct:
+                        _append_chat_log(request.chat_id, {"stage": "scenario1_direct_id", "pid": pid_direct})
+                        return ChatResponse(base_random_keys=[pid_direct])
+
+                    # Extract refined product name for lexical search
+                    refined = extract_product_name(request.chat_id, user_query or "") or (user_query or "")
+                    top_ids = bm25_search(request.chat_id, refined.strip(), k=10) or []
+                    name_map = _base_names_for_keys(top_ids)
+
+                    # If no candidates, fallback to previous resolver
+                    if not top_ids:
+                        pid_fb = _resolve_base_id(user_query)
+                        _append_chat_log(request.chat_id, {"stage": "scenario1_fallback", "pid": pid_fb})
+                        return ChatResponse(base_random_keys=[pid_fb] if pid_fb else None)
+
+                    # Prepare candidate list for LLM
+                    candidates_lines = []
+                    for rid in top_ids:
+                        nm = name_map.get(str(rid), "")
+                        candidates_lines.append(f"- id: {rid} | name: {nm}")
+                    candidates_blob = "\n".join(candidates_lines)
+
+                    # Ask LLM to choose the best candidate id
+                    try:
+                        from openai import OpenAI  # type: ignore
+                        client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=10)
+                        sys_prompt = (
+                            "English: You must pick the single best-matching product from the provided candidate list given the user's Persian request.\n"
+                            "Return ONLY strict JSON: {\"random_key\": \"<id>\", \"name\": \"<best_name>\"}.\n\n"
+                            "فارسی: با توجه به درخواست کاربر و فهرست کاندیداها، فقط یک گزینه را انتخاب کن و فقط JSON برگردان.\n"
+                        )
+                        user_msg = (
+                            "User request (Persian):\n" + (user_query or "") +
+                            "\n\nCandidates (id | name):\n" + candidates_blob +
+                            "\n\nReturn ONLY JSON."
+                        )
+                        resp = client.chat.completions.create(
+                            model=os.environ.get("LLM_ROUTER_MODEL", "gpt-4o-mini"),
+                            response_format={"type": "json_object"},
+                            messages=[
+                                {"role": "system", "content": sys_prompt},
+                                {"role": "user", "content": user_msg},
+                            ],
+                            timeout=10,
+                        )
+                        import json as _json
+                        data = _json.loads(resp.choices[0].message.content or "{}")
+                        chosen_id = str(data.get("random_key") or "").strip()
+                        chosen_name = str(data.get("name") or "").strip()
+                        if chosen_id:
+                            _append_chat_log(request.chat_id, {"stage": "scenario1_llm_choice", "id": chosen_id, "name": chosen_name})
+                            return ChatResponse(base_random_keys=[chosen_id])
+                    except Exception:
+                        pass
+
+                    # Fallback: return the first BM25 result
+                    _append_chat_log(request.chat_id, {"stage": "scenario1_bm25_fallback", "first": top_ids[0]})
+                    return ChatResponse(base_random_keys=[top_ids[0]])
+                except Exception:
+                    # Last-resort fallback
+                    pid = _resolve_base_id(user_query)
+                    _append_chat_log(request.chat_id, {"stage": "scenario1_resolve_error_fallback", "pid": pid})
+                    return ChatResponse(base_random_keys=[pid] if pid else None)
 
             if scenario_num == 2:
                 # Scenario 2: resolve product id -> answer about product

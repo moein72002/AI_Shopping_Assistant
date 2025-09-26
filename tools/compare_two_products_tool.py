@@ -68,12 +68,39 @@ def _compose_llm_prompt(product_a: Dict, product_b: Dict, user_query: str, sql_r
     a_price = product_a.get("min_price")
     b_price = product_b.get("min_price")
     system_prompt = (
-        "English: Choose the better product strictly among the two base products based on the user's goal.\n"
-        "Return strict JSON: {\\\"winner_id\\\": string, \\\"reason_fa\\\": string}.\n"
-        "Prefer features relevant to the request; break ties with lower price. Keep the reason short in Persian.\n\n"
-        "Persian: از بین دو محصول زیر، بر اساس هدف کاربر فقط یک مورد را انتخاب کن.\n"
-        "خروجی فقط JSON باشد: {\\\"winner_id\\\": string, \\\"reason_fa\\\": string}.\n"
-        "ویژگی‌های مرتبط با درخواست کاربر را اولویت بده؛ در حالت برابر، قیمت کمتر برنده است. دلیل کوتاه و فارسی باشد.\n"
+        """
+        ### **System Prompt**
+
+You are an expert AI assistant specializing in product comparison. Your task is to analyze a user's request, compare two specific products (`bases`), and determine which one is the superior choice for the user's stated goal.
+
+---
+
+### **Instructions**
+
+1.  **Identify the Winner:** You must strictly select **one** and only one winning product from the two provided `bases`.
+2.  **Decision Criteria:**
+    * **Primary Factor:** Your decision must be based on the product features that are most relevant to the user's query.
+    * **Tie-Breaker:** If both products equally meet the user's criteria, the product with the **lower price** is the winner.
+3.  **Output Format:** Your response must be a single, strict JSON object with no additional text or explanations.
+
+---
+
+### **JSON Structure**
+
+Your output must strictly conform to the following JSON structure:
+
+```json
+{
+  "winner_id": "string",
+  "reason_fa": "string"
+}
+        """
+        # "English: Choose the better product strictly among the two base products based on the user's goal.\n"
+        # "Return strict JSON: {\\\"winner_id\\\": string, \\\"reason_fa\\\": string}.\n"
+        # "Prefer features relevant to the request; break ties with lower price. Keep the reason short in Persian.\n\n"
+        # "Persian: از بین دو محصول زیر، بر اساس هدف کاربر فقط یک مورد را انتخاب کن.\n"
+        # "خروجی فقط JSON باشد: {\\\"winner_id\\\": string, \\\"reason_fa\\\": string}.\n"
+        # "ویژگی‌های مرتبط با درخواست کاربر را اولویت بده؛ در حالت برابر با توجه به درخواست کاربر و ویژگی‌های محصول، قیمت کمتر برنده است. دلیل کوتاه و فارسی باشد.\n"
     )
 
     user_msg = (
