@@ -16,9 +16,9 @@ def _append_chat_log(chat_id: str, record: dict):
             "timestamp": datetime.utcnow().isoformat(),
             **record,
         }
-        print(f"[utils] Appending chat log to {path}: {payload}")
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        # print(f"[utils] Appending chat log to {path}: {payload}")
+        # with open(path, "a", encoding="utf-8") as f:
+        #     f.write(json.dumps(payload, ensure_ascii=False) + "\n")
     except Exception:
         # Never fail request due to logging issues
         pass
