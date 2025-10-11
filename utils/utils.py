@@ -4,6 +4,30 @@ from datetime import datetime
 from typing import Dict, List as _List
 import sqlite3
 
+# --- Dataset path helpers ---
+def get_datasets_dir() -> str:
+    """Return a writable datasets directory consistent with app startup logic.
+
+    Preference order:
+    1) DATASETS_DIR env var (ensure directory exists)
+    2) Fallback to ./datasets under app root
+    """
+    datasets_dir = os.environ.get("DATASETS_DIR") or "/datasets/"
+    try:
+        os.makedirs(datasets_dir, exist_ok=True)
+        return datasets_dir
+    except Exception:
+        # Fallback to project-local datasets directory
+        app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        fallback_dir = os.path.join(app_root, "datasets")
+        os.makedirs(fallback_dir, exist_ok=True)
+        return fallback_dir
+
+
+def get_db_path() -> str:
+    """Return absolute path to torob.db inside the resolved datasets directory."""
+    return os.path.join(get_datasets_dir(), "torob.db")
+
 # --- Per-chat logging helpers ---
 def _append_chat_log(chat_id: str, record: dict):
     try:
@@ -45,7 +69,7 @@ def _base_names_for_keys(keys: _List[str]) -> Dict[str, str]:
     if not keys:
         return {}
 
-    db_path = os.path.join("/datasets/", "torob.db")
+    db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:

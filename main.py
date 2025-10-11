@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -14,6 +14,7 @@ import subprocess as _subp
 import logging
 import subprocess
 import sys
+import asyncio
 from tools.image_search import find_most_similar_product, warm_up_image_search
 from tools.bm25_tool import bm25_search
 
@@ -35,6 +36,8 @@ handler.setFormatter(formatter)
 if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', None) == handler.baseFilename for h in logger.handlers):
     logger.addHandler(handler)
 # --- End Logging Setup ---
+
+root_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 load_dotenv()
@@ -59,7 +62,19 @@ async def log_requests(request: Request, call_next):
         except json.JSONDecodeError:
             log_data["request_body"] = "Invalid JSON"
 
-    response = await call_next(request)
+    # Apply a 30s timeout only for /chat endpoint
+    if request.url.path == "/chat":
+        try:
+            response = await asyncio.wait_for(call_next(request), timeout=30)
+        except asyncio.TimeoutError:
+            timeout_payload = {
+                "message": "درخواست بیش از ۳۰ ثانیه طول کشید و متوقف شد.",
+                "base_random_keys": None,
+                "member_random_keys": None,
+            }
+            response = JSONResponse(content=timeout_payload, status_code=200)
+    else:
+        response = await call_next(request)
 
     # A bit of a workaround to get the response body from a StreamingResponse
     response_body = b""
@@ -170,7 +185,15 @@ async def admin_page():
 async def maybe_download_kaggle_dataset():
     """Ensure required Kaggle artifacts exist in project root: torob.db, products.index, image_paths.json."""
     try:
-        datasets_dir = os.path.dirname("/datasets/")
+        # Prefer env-provided writable dir; fallback to /datasets/ then ./datasets under app
+        datasets_dir = os.environ.get("DATASETS_DIR") or "/datasets/"
+        try:
+            os.makedirs(datasets_dir, exist_ok=True)
+        except Exception:
+            fallback_dir = os.path.join(root_dir, "datasets")
+            os.makedirs(fallback_dir, exist_ok=True)
+            datasets_dir = fallback_dir
+        print(f"[startup] Using datasets_dir: {datasets_dir}")
         db_path = os.path.join(datasets_dir, "torob.db")
         product_index_path = os.path.join(datasets_dir, "products.index")
         image_paths_path = os.path.join(datasets_dir, "image_paths.json")
@@ -180,8 +203,23 @@ async def maybe_download_kaggle_dataset():
 
         print(
             f"[startup] Kaggle check: force={force}, have_kaggle={have_kaggle}, "
-            f"db_exists={os.path.exists(db_path)}, product_index_exists={os.path.exists(product_index_path)}, image_paths_exists={os.path.exists(image_paths_path)}"
+            f"db_exists={os.path.exists(db_path)}, main_db_exists={os.path.exists(product_index_path)}"
         )
+
+        # --- Integrity check for torob.db ---
+        def _db_integrity_ok(path: str) -> bool:
+            if not os.path.exists(path):
+                return False
+            try:
+                conn = sqlite3.connect(path)
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                cur.execute("PRAGMA integrity_check;")
+                row = cur.fetchone()
+                conn.close()
+                return bool(row) and str(row[0]).lower() == "ok"
+            except Exception:
+                return False
 
         # --- torob.db (database) ---
         if (not os.path.exists(db_path) or force) and have_kaggle:
@@ -189,8 +227,10 @@ async def maybe_download_kaggle_dataset():
             if os.path.exists(script_path):
                 try:
                     print("[startup] Downloading torob.db from Kaggle...")
-                    subprocess.run([sys.executable, script_path], check=True, cwd=root_dir)
-                    produced = os.path.join("/datasets/", "torob.db")
+                    env = dict(os.environ)
+                    env["DATASETS_DIR"] = datasets_dir
+                    subprocess.run([sys.executable, script_path], check=True, cwd=root_dir, env=env)
+                    produced = os.path.join(datasets_dir, "torob.db")
                     if os.path.exists(produced):
                         print("[startup] torob.db downloaded successfully")
                     # if os.path.exists(produced):
@@ -204,14 +244,38 @@ async def maybe_download_kaggle_dataset():
             else:
                 print("[startup] Kaggle DB script not found; skipping torob.db download")
 
+        # If DB exists but is malformed, attempt self-heal by re-downloading
+        if os.path.exists(db_path) and not _db_integrity_ok(db_path):
+            print("[startup] Detected malformed torob.db (integrity check failed). Attempting self-heal...")
+            try:
+                bad_path = db_path + ".bad"
+                try:
+                    os.replace(db_path, bad_path)
+                except Exception:
+                    pass
+                if have_kaggle:
+                    script_path = os.path.join(root_dir, "download_data_scripts", "download_data_from_kaggle.py")
+                    if os.path.exists(script_path):
+                        env = dict(os.environ)
+                        env["DATASETS_DIR"] = datasets_dir
+                        subprocess.run([sys.executable, script_path], check=True, cwd=root_dir, env=env)
+                        print("[startup] Re-downloaded torob.db after corruption.")
+                else:
+                    print("[startup] Kaggle credentials missing; cannot re-download torob.db. Service may be degraded.")
+            except Exception as e:
+                print(f"[startup] Self-heal failed: {e}")
+
         # --- products.index and image_paths.json (image search index) ---
         needs_product_assets = (not os.path.exists(product_index_path) or not os.path.exists(image_paths_path) or force)
+        print(f"[startup] needs_product_assets: {needs_product_assets}, os.path.exists(product_index_path): {os.path.exists(product_index_path)}, os.path.exists(image_paths_path): {os.path.exists(image_paths_path)}")
         if needs_product_assets and have_kaggle:
             script2_path = os.path.join(root_dir, "download_data_scripts", "download_product_index_from_kaggle.py")
             if os.path.exists(script2_path):
                 try:
                     print("[startup] Downloading product index assets from Kaggle...")
-                    subprocess.run([sys.executable, script2_path], check=True, cwd=root_dir)
+                    env = dict(os.environ)
+                    env["DATASETS_DIR"] = datasets_dir
+                    subprocess.run([sys.executable, script2_path], check=True, cwd=root_dir, env=env)
                     print("[startup] product index assets downloaded successfully")
                     # # Search for the files under /datasets/ and move them to root
                     # shopping_dir = os.path.join("/datasets/")
@@ -232,6 +296,24 @@ async def maybe_download_kaggle_dataset():
 
         if not have_kaggle:
             print("[startup] Kaggle env vars not present; skipping all downloads")
+
+        # After downloads/self-heal, ensure DB contains expected tables; else build from parquet
+        try:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='base_products'")
+            row = cur.fetchone()
+            conn.close()
+            if row is None:
+                print("[startup] base_products table missing. Building torob.db from parquet files...")
+                try:
+                    from scripts.load_data import load_parquet_to_sqlite
+                    load_parquet_to_sqlite(db_path=db_path, data_dir=os.path.join(root_dir, 'db_data'))
+                    print("[startup] torob.db rebuilt from parquet successfully.")
+                except Exception as e:
+                    print(f"[startup] Failed to rebuild torob.db from parquet: {e}")
+        except Exception as e:
+            print(f"[startup] DB verification failed: {e}")
 
         _append_chat_log("startup", {"stage": "warm_up_image_search"})
         warm_up_product_id = warm_up_image_search()

@@ -27,7 +27,7 @@ print("Authentication successful.")
 
 # --- Configuration ---
 dataset_slug = 'moeinmadadi/product-index'
-download_path = '/datasets/'
+download_path = os.environ.get('DATASETS_DIR') or '/datasets/'
 os.makedirs(download_path, exist_ok=True)
 
 print(f"Downloading dataset '{dataset_slug}' to '{download_path}'...")
