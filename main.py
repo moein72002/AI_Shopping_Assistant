@@ -825,3 +825,18 @@ Your response must be in the exact format: `scenario_number = X`, where `X` is t
             # Graceful fallback to bm25
             results = bm25_search(request.chat_id, user_query.strip(), k=5)
             return ChatResponse(base_random_keys=results)
+
+    # Final fallback: classification failed or returned an unsupported scenario id.
+    _append_chat_log(
+        request.chat_id,
+        {"stage": "scenario_classification_fallback", "scenario_num": scenario_num},
+    )
+    try:
+        results = bm25_search(request.chat_id, user_query.strip(), k=5)
+        return ChatResponse(base_random_keys=results or None)
+    except Exception as e:
+        _append_chat_log(
+            request.chat_id,
+            {"stage": "scenario_classification_fallback_error", "error": str(e)},
+        )
+        return ChatResponse(message="متاسفانه در پردازش درخواست خطایی رخ داد.")
