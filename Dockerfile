@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -10,9 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
 
 WORKDIR /app
 
-# Install deps with uv (faster, deterministic). Ensure uv is present.
+# Install deps with uv (faster, deterministic).
+# Keep setuptools < 81 because some source builds still import pkg_resources.
 COPY requirements.txt ./
-RUN pip install uv && uv pip install -r requirements.txt --system --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
+RUN pip install uv "setuptools<81" && uv pip install -r requirements.txt --system --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match --no-build-isolation
 
 # --- MODIFIED SECTION ---
 # Include the Kaggle downloader directory so startup can locate it at runtime
@@ -24,6 +25,7 @@ COPY utils ./utils
 # Copy the rest of the application files
 COPY main.py ./
 COPY admin_ui.py ./
+COPY streamlit_app.py ./
 COPY start.sh ./
 COPY tools ./tools
 COPY tests ./tests

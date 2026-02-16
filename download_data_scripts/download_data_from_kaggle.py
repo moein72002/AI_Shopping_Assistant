@@ -38,15 +38,31 @@ print("Authentication successful.")
 
 # --- Configuration ---
 dataset_slug = 'moeinmadadi/ai-shopping-assistant-db'
-download_path = os.environ.get('DATASETS_DIR') or '/datasets/'
+if os.environ.get('DATASETS_DIR'):
+    download_path = os.environ.get('DATASETS_DIR')
+else:
+    # Default to project's db_data when running locally (avoids read-only /datasets/ on macOS)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    download_path = os.path.join(project_root, 'db_data')
 os.makedirs(download_path, exist_ok=True)
 
 # --- Download and Unzip ---
 print(f"Downloading dataset '{dataset_slug}' to '{download_path}'...")
-api.dataset_download_files(
-    dataset=dataset_slug,
-    path=download_path,
-    unzip=True
-)
-
+try:
+    api.dataset_download_files(
+        dataset=dataset_slug,
+        path=download_path,
+        unzip=True
+    )
+except Exception as e:
+    err_msg = str(e)
+    if "403" in err_msg or "Forbidden" in err_msg or "denied" in err_msg.lower():
+        print("\nKaggle returned 403 (Permission denied). Common fixes:")
+        print("  1. Open the dataset in your browser and accept the rules (if any):")
+        print(f"     https://www.kaggle.com/datasets/{dataset_slug}")
+        print("  2. In Kaggle: Account → API → ensure your token has not expired and has dataset access.")
+        print("  3. If the dataset is private, ensure your Kaggle account has been granted access.")
+    if hasattr(e, "body") and e.body:
+        print(f"  API response: {e.body}")
+    raise
 print(f"Dataset downloaded and unzipped successfully in '{download_path}'.")

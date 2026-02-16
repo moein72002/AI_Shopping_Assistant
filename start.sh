@@ -5,7 +5,7 @@
 chmod 666 requests.log
 
 # Start API server (gunicorn with uvicorn workers) in the background
-gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:${PORT:-8080} --timeout 60 main:app &
+gunicorn -k uvicorn.workers.UvicornWorker -w 1 -b 0.0.0.0:${PORT:-8080} --timeout 60 main:app &
 
 # Start Admin Logs UI in the background
 # The server.address and server.port flags are important for Docker

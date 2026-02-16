@@ -7,6 +7,7 @@
 !download_data.sh
 !main.py
 !admin_ui.py
+!streamlit_app.py
 !start.sh
 !torob.db
 !tools
