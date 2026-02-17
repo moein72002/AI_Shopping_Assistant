@@ -1,0 +1,53 @@
+{
+  "run_id": "20260216T232831Z",
+  "base_url": "http://localhost:8080",
+  "file": "server_tests/scenario7.json",
+  "limit": 0,
+  "timeout": 30,
+  "prompt": "این تصویر چیه؟",
+  "count": 2,
+  "results": [
+    {
+      "index": 1,
+      "chat_id": "t1420-efffdbdb-50dc-4c6a-b069-c43becc43d55",
+      "timestamp_utc": "2026-02-16T23:28:31.384136+00:00",
+      "request": {
+        "messages_count": 2,
+        "text_prompt": "این تصویر چیه؟",
+        "image_length": 15243,
+        "image_prefix": "data:image/jpeg;base64,/9j/4AAQSkZJRgABA"
+      },
+      "response": {
+        "status": 200,
+        "elapsed_ms": 25318,
+        "request_id": "3bb2fe90-08be-4a76-8ad9-324630df6139",
+        "data": {
+          "message": "خطا در پردازش تصویر. لطفاً دوباره تلاش کنید.",
+          "base_random_keys": null,
+          "member_random_keys": null
+        }
+      }
+    },
+    {
+      "index": 2,
+      "chat_id": "t1456-4f0aa8fa-2cd0-4912-bf05-99c2fc28abc2",
+      "timestamp_utc": "2026-02-16T23:28:56.702667+00:00",
+      "request": {
+        "messages_count": 2,
+        "text_prompt": "این تصویر چیه؟",
+        "image_length": 13011,
+        "image_prefix": "data:image/jpeg;base64,/9j/4AAQSkZJRgABA"
+      },
+      "response": {
+        "status": 200,
+        "elapsed_ms": 5487,
+        "request_id": "db6f22f4-1418-4d25-af6d-22d96166b0eb",
+        "data": {
+          "message": "خطا در پردازش تصویر. لطفاً دوباره تلاش کنید.",
+          "base_random_keys": null,
+          "member_random_keys": null
+        }
+      }
+    }
+  ]
+}

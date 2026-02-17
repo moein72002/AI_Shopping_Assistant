@@ -2,7 +2,8 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    HF_HOME=/opt/hf-cache
 
 # Runtime dependency for faiss-cpu (OpenMP)
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
@@ -14,6 +15,17 @@ WORKDIR /app
 # Keep setuptools < 81 because some source builds still import pkg_resources.
 COPY requirements.txt ./
 RUN pip install uv "setuptools<81" && uv pip install -r requirements.txt --system --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match --no-build-isolation
+
+# Pre-cache CLIP artifacts in the image so runtime does not re-download from HF Hub.
+RUN mkdir -p /opt/hf-cache
+RUN python - <<'PY'
+from transformers import CLIPModel, CLIPProcessor
+
+model_id = "openai/clip-vit-large-patch14"
+CLIPModel.from_pretrained(model_id)
+CLIPProcessor.from_pretrained(model_id)
+print(f"Cached Hugging Face model: {model_id}")
+PY
 
 # --- MODIFIED SECTION ---
 # Include the Kaggle downloader directory so startup can locate it at runtime

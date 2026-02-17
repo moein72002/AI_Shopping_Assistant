@@ -1,0 +1,47 @@
+{
+  "run_id": "20260216T233017Z",
+  "base_url": "http://localhost:8080",
+  "file": "server_tests/scenario7.json",
+  "limit": 0,
+  "timeout": 30,
+  "prompt": "این تصویر چیه؟",
+  "count": 2,
+  "results": [
+    {
+      "index": 1,
+      "chat_id": "t1420-efffdbdb-50dc-4c6a-b069-c43becc43d55",
+      "timestamp_utc": "2026-02-16T23:30:17.197480+00:00",
+      "request": {
+        "messages_count": 2,
+        "text_prompt": "این تصویر چیه؟",
+        "image_length": 15243,
+        "image_prefix": "data:image/jpeg;base64,/9j/4AAQSkZJRgABA"
+      },
+      "error": {
+        "status": "error",
+        "error": "HTTPConnectionPool(host='localhost', port=8080): Max retries exceeded with url: /chat (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x10a835d00>, 'Connection to localhost timed out. (connect timeout=30)'))"
+      }
+    },
+    {
+      "index": 2,
+      "chat_id": "t1456-4f0aa8fa-2cd0-4912-bf05-99c2fc28abc2",
+      "timestamp_utc": "2026-02-16T23:30:25.031559+00:00",
+      "request": {
+        "messages_count": 2,
+        "text_prompt": "این تصویر چیه؟",
+        "image_length": 13011,
+        "image_prefix": "data:image/jpeg;base64,/9j/4AAQSkZJRgABA"
+      },
+      "response": {
+        "status": 200,
+        "elapsed_ms": 12196,
+        "request_id": "bb576ba8-7ef2-471f-b1c7-97774bd483b8",
+        "data": {
+          "message": "خطا در پردازش تصویر. لطفاً دوباره تلاش کنید.",
+          "base_random_keys": null,
+          "member_random_keys": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "run_id": "20260216T232507Z",
+  "base_url": "http://localhost:9999",
+  "file": "server_tests/scenario7.json",
+  "limit": 1,
+  "timeout": 1,
+  "prompt": "این تصویر چیه؟",
+  "count": 1,
+  "results": [
+    {
+      "index": 1,
+      "chat_id": "t1420-efffdbdb-50dc-4c6a-b069-c43becc43d55",
+      "timestamp_utc": "2026-02-16T23:25:07.381324+00:00",
+      "request": {
+        "messages_count": 2,
+        "text_prompt": "این تصویر چیه؟",
+        "image_length": 15243,
+        "image_prefix": "data:image/jpeg;base64,/9j/4AAQSkZJRgABA"
+      },
+      "error": {
+        "status": "error",
+        "error": "HTTPConnectionPool(host='localhost', port=9999): Max retries exceeded with url: /chat (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x1080525a0>: Failed to establish a new connection: [Errno 1] Operation not permitted'))"
+      }
+    }
+  ]
+}

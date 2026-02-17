@@ -1,0 +1,39 @@
+{
+  "run_id": "20260216T221709Z",
+  "timestamp_utc": "2026-02-16T22:17:22.305001+00:00",
+  "base_url": "http://localhost:8080",
+  "file": "server_tests/scenario1.json",
+  "samples": 1,
+  "workers": 4,
+  "timeout": 30,
+  "success": 1,
+  "failed": 0,
+  "results": [
+    {
+      "index": 1,
+      "chat_id": "t137-5d59b9d6-4f4d-4490-9e14-31b38cc24e57",
+      "payload": {
+        "chat_id": "t137-5d59b9d6-4f4d-4490-9e14-31b38cc24e57",
+        "messages": [
+          {
+            "type": "text",
+            "content": "سلام، من به دنبال خرید ساعت دیواری مدرن فلزی سایز 60 مدل 122 هستم. (پس کرایه)  اگر موجود دارید لطفا راهنمایی کنید. ممنون."
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "elapsed_ms": 12388,
+        "request_id": "e62f9e49-127a-45e9-abf4-1c32eacb727a",
+        "content_type": "application/json",
+        "data": {
+          "message": null,
+          "base_random_keys": [
+            "vbptlg"
+          ],
+          "member_random_keys": null
+        }
+      }
+    }
+  ]
+}

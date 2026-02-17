@@ -8,6 +8,9 @@ import re
 import json
 from typing import Dict, List as _List
 from datetime import datetime
+import time
+import traceback
+from uuid import uuid4
 from utils.utils import _append_chat_log, _reset_chat_log, _base_names_for_keys
 import sqlite3
 import subprocess as _subp
@@ -15,7 +18,11 @@ import logging
 import subprocess
 import sys
 import asyncio
-from tools.image_search import find_most_similar_product, warm_up_image_search
+from tools.image_search import (
+    find_most_similar_product,
+    preload_image_search_resources,
+    warm_up_image_search,
+)
 from tools.bm25_tool import bm25_search
 
 # --- Logging Setup ---
@@ -47,50 +54,97 @@ app = FastAPI()
 # --- Logging Middleware ---
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    started_at = time.perf_counter()
+    request_id = str(uuid4())
     log_data = {
         "timestamp": datetime.utcnow().isoformat(),
-        "client_ip": request.client.host,
+        "request_id": request_id,
+        "client_ip": request.client.host if request.client else None,
         "method": request.method,
         "path": request.url.path,
     }
+    chat_id = None
 
     # Only log request body for /chat endpoint
     if request.url.path == "/chat":
         try:
             body = await request.json()
             log_data["request_body"] = body
+            if isinstance(body, dict):
+                chat_id = body.get("chat_id")
+                if chat_id:
+                    log_data["chat_id"] = chat_id
         except json.JSONDecodeError:
             log_data["request_body"] = "Invalid JSON"
+        except Exception as e:
+            log_data["request_body_error"] = str(e)
 
     # Apply a 30s timeout only for /chat endpoint
-    if request.url.path == "/chat":
-        try:
+    timeout_hit = False
+    try:
+        if request.url.path == "/chat":
             response = await asyncio.wait_for(call_next(request), timeout=30)
-        except asyncio.TimeoutError:
-            timeout_payload = {
-                "message": "درخواست بیش از ۳۰ ثانیه طول کشید و متوقف شد.",
-                "base_random_keys": None,
-                "member_random_keys": None,
-            }
-            response = JSONResponse(content=timeout_payload, status_code=200)
-    else:
-        response = await call_next(request)
+        else:
+            response = await call_next(request)
+    except asyncio.TimeoutError:
+        timeout_hit = True
+        timeout_payload = {
+            "message": "درخواست بیش از ۳۰ ثانیه طول کشید و متوقف شد.",
+            "base_random_keys": None,
+            "member_random_keys": None,
+        }
+        response = JSONResponse(content=timeout_payload, status_code=200)
+    except Exception as e:
+        log_data["exception"] = {
+            "type": type(e).__name__,
+            "message": str(e),
+            "traceback": traceback.format_exc(),
+        }
+        response = JSONResponse(
+            content={"message": "Internal server error."},
+            status_code=500,
+        )
 
     # A bit of a workaround to get the response body from a StreamingResponse
     response_body = b""
-    async for chunk in response.body_iterator:
-        response_body += chunk
+    try:
+        async for chunk in response.body_iterator:
+            response_body += chunk
+    except Exception as e:
+        log_data["response_stream_error"] = str(e)
     
     log_data["status_code"] = response.status_code
     try:
         log_data["response_body"] = json.loads(response_body)
     except json.JSONDecodeError:
         log_data["response_body"] = response_body.decode('utf-8', errors='ignore')
+    if timeout_hit:
+        log_data["timeout"] = True
 
-    logger.info(json.dumps(log_data))
+    log_data["duration_ms"] = int((time.perf_counter() - started_at) * 1000)
+
+    if chat_id:
+        _append_chat_log(
+            chat_id,
+            {
+                "stage": "http_middleware",
+                "request_id": request_id,
+                "status_code": response.status_code,
+                "duration_ms": log_data["duration_ms"],
+                "timeout": timeout_hit,
+            },
+        )
+
+    logger.info(json.dumps(log_data, ensure_ascii=False, default=str))
     
     # We need to create a new response because the body_iterator has been consumed
-    return Response(content=response_body, status_code=response.status_code, headers=dict(response.headers))
+    headers = dict(response.headers)
+    headers["x-request-id"] = request_id
+    return Response(
+        content=response_body,
+        status_code=response.status_code,
+        headers=headers,
+    )
 # --- End Logging Middleware ---
 
 
@@ -315,6 +369,11 @@ async def maybe_download_kaggle_dataset():
         except Exception as e:
             print(f"[startup] DB verification failed: {e}")
 
+        _append_chat_log("startup", {"stage": "image_search_preload_start"})
+        preload_info = preload_image_search_resources("startup")
+        _append_chat_log("startup", {"stage": "image_search_preload_done", "preload_info": preload_info})
+        print(f"[startup] Image search preload: {preload_info}")
+
         _append_chat_log("startup", {"stage": "warm_up_image_search"})
         warm_up_product_id = warm_up_image_search()
         print(f"[startup] Warm up image search: {warm_up_product_id}")
@@ -357,20 +416,58 @@ async def chat(request: ChatRequest):
     try:
         last_msg = request.messages[-1]
         if last_msg.type == "image":
-            _append_chat_log(request.chat_id, {"stage": "image_search_start_1", "type": last_msg.type})
+            _append_chat_log(
+                request.chat_id,
+                {
+                    "stage": "image_flow_start",
+                    "last_msg_type": last_msg.type,
+                    "messages_count": len(request.messages),
+                },
+            )
             # Find most similar product by image
-            img_b64 = last_msg.content
-            _append_chat_log(request.chat_id, {"stage": "image_search_start_2"})
+            img_b64 = last_msg.content or ""
+            _append_chat_log(
+                request.chat_id,
+                {
+                    "stage": "image_flow_payload_meta",
+                    "image_length": len(img_b64),
+                    "image_prefix": img_b64[:40],
+                    "has_data_uri_prefix": img_b64.startswith("data:image"),
+                },
+            )
             product_id = find_most_similar_product(request.chat_id, img_b64)
-            _append_chat_log(request.chat_id, {"stage": "image_search", "result": str(product_id)})
+            _append_chat_log(
+                request.chat_id,
+                {
+                    "stage": "image_search_result",
+                    "raw_result": str(product_id),
+                    "result_type": type(product_id).__name__,
+                },
+            )
 
             # If image matching failed, return a graceful message
             if not product_id or isinstance(product_id, str) and product_id.lower().startswith("error:"):
+                _append_chat_log(
+                    request.chat_id,
+                    {
+                        "stage": "image_flow_failed",
+                        "reason": "invalid_or_error_product_id",
+                        "raw_result": str(product_id),
+                    },
+                )
                 return ChatResponse(message="خطا در پردازش تصویر. لطفاً دوباره تلاش کنید.")
 
             # Use previous text (if any) to determine Scenario 6 vs 7
             prior_texts = [m.content for m in request.messages if getattr(m, "type", "text") == "text"]
             prior_text = (prior_texts[-1] if prior_texts else "").strip()
+            _append_chat_log(
+                request.chat_id,
+                {
+                    "stage": "image_flow_prior_text",
+                    "prior_text_count": len(prior_texts),
+                    "prior_text": prior_text[:300],
+                },
+            )
 
             # LLM: classify as scenario 6 or 7 from the user's accompanying text
             try:
@@ -434,11 +531,28 @@ The user wants to **find a product related to the image**. The query is about ge
                     timeout=10,
                 )
                 cls_text = (resp.choices[0].message.content or "").strip()
-            except Exception:
+                _append_chat_log(
+                    request.chat_id,
+                    {"stage": "image_flow_classification_result", "raw": cls_text},
+                )
+            except Exception as e:
+                _append_chat_log(
+                    request.chat_id,
+                    {
+                        "stage": "image_flow_classification_error",
+                        "error_type": type(e).__name__,
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                    },
+                )
                 cls_text = "scenario_number = 7"  # default to returning a product if classifier fails
 
             if "= 7" in cls_text:
                 # Scenario 7: return the most similar base id
+                _append_chat_log(
+                    request.chat_id,
+                    {"stage": "image_flow_scenario7_response", "product_id": product_id},
+                )
                 return ChatResponse(base_random_keys=[product_id])
 
             # Scenario 6: return a concise Persian noun for the main object
@@ -446,6 +560,14 @@ The user wants to **find a product related to the image**. The query is about ge
                 # Get product display name for guidance
                 names = _base_names_for_keys([product_id])
                 display_name = names.get(str(product_id), "")
+                _append_chat_log(
+                    request.chat_id,
+                    {
+                        "stage": "image_flow_scenario6_display_name",
+                        "product_id": product_id,
+                        "display_name": display_name,
+                    },
+                )
                 from openai import OpenAI
                 client = OpenAI(base_url=os.environ.get("TOROB_PROXY_URL"), timeout=15)
                 gen_msg = [
@@ -465,11 +587,33 @@ The user wants to **find a product related to the image**. The query is about ge
                 )
                 noun = (gen_resp.choices[0].message.content or "").strip()
                 noun = noun.split("\n")[0][:50]
+                _append_chat_log(
+                    request.chat_id,
+                    {"stage": "image_flow_scenario6_response", "noun": noun},
+                )
                 return ChatResponse(message=noun or display_name or "")
-            except Exception:
+            except Exception as e:
+                _append_chat_log(
+                    request.chat_id,
+                    {
+                        "stage": "image_flow_scenario6_error",
+                        "error_type": type(e).__name__,
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                    },
+                )
                 return ChatResponse(message="")
-    except Exception:
-        return ChatResponse(message="")
+    except Exception as e:
+        _append_chat_log(
+            request.chat_id,
+            {
+                "stage": "image_flow_outer_error",
+                "error_type": type(e).__name__,
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+        return ChatResponse(message="خطا در پردازش تصویر. لطفاً دوباره تلاش کنید.")
 
     user_query = request.messages[-1].content
     

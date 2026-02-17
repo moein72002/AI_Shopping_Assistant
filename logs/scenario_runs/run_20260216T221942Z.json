@@ -1,0 +1,65 @@
+{
+  "run_id": "20260216T221942Z",
+  "timestamp_utc": "2026-02-16T22:19:52.468910+00:00",
+  "base_url": "http://localhost:8080",
+  "file": "server_tests/scenario1.json",
+  "samples": 2,
+  "workers": 4,
+  "timeout": 30,
+  "success": 2,
+  "failed": 0,
+  "results": [
+    {
+      "index": 1,
+      "chat_id": "t137-5d59b9d6-4f4d-4490-9e14-31b38cc24e57",
+      "payload": {
+        "chat_id": "t137-5d59b9d6-4f4d-4490-9e14-31b38cc24e57",
+        "messages": [
+          {
+            "type": "text",
+            "content": "سلام، من به دنبال خرید ساعت دیواری مدرن فلزی سایز 60 مدل 122 هستم. (پس کرایه)  اگر موجود دارید لطفا راهنمایی کنید. ممنون."
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "elapsed_ms": 9840,
+        "request_id": "c6e2e4c2-39d7-4417-a448-3fd9b66fb828",
+        "content_type": "application/json",
+        "data": {
+          "message": null,
+          "base_random_keys": [
+            "vbptlg"
+          ],
+          "member_random_keys": null
+        }
+      }
+    },
+    {
+      "index": 2,
+      "chat_id": "t92-772162b3-819e-4b74-9233-e7ded90c806e",
+      "payload": {
+        "chat_id": "t92-772162b3-819e-4b74-9233-e7ded90c806e",
+        "messages": [
+          {
+            "type": "text",
+            "content": "سلام. لطفاً پاف نیمکت انتظار سه نفره با ستون‌بندی اسفنج مبلی و رنگ‌بندی مختلف را که امکان ارسال به سراسر ایران دارد، برای من تهیه کنید. متشکرم."
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "elapsed_ms": 9840,
+        "request_id": "1f8dd93d-ade6-4b55-89c8-c078ae887ba5",
+        "content_type": "application/json",
+        "data": {
+          "message": null,
+          "base_random_keys": [
+            "qiugsm"
+          ],
+          "member_random_keys": null
+        }
+      }
+    }
+  ]
+}
